@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { useStore } from '../store';
 import {
@@ -12,8 +11,12 @@ import { Activity, Calendar, Clock, AlertCircle } from 'lucide-react';
 export const Overview: React.FC = () => {
   const { tasks, users, activities, setSelectedTask } = useStore();
 
-  // CRITICAL: Analytics now INCLUDE Subtasks (as requested)
   const allTasks = tasks;
+
+  // 1. Khai báo doneCount
+  const totalTasks = allTasks.length;
+  const doneCount = allTasks.filter(t => t.status === TaskStatus.DONE).length;
+  const completionPercentage = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
   const statusData = useMemo(() => {
     const counts = allTasks.reduce((acc, task) => {
@@ -22,10 +25,10 @@ export const Overview: React.FC = () => {
     }, {} as Record<TaskStatus, number>);
 
     return [
-      { name: 'To Do', value: counts[TaskStatus.TODO] || 0, color: '#94a3b8' }, // Slate
-      { name: 'Pending', value: counts[TaskStatus.PENDING] || 0, color: '#fbbf24' }, // Amber
-      { name: 'In Progress', value: counts[TaskStatus.IN_PROGRESS] || 0, color: '#3b82f6' }, // Blue
-      { name: 'Done', value: counts[TaskStatus.DONE] || 0, color: '#22c55e' }, // Green
+      { name: 'To Do', value: counts[TaskStatus.TODO] || 0, color: '#94a3b8' },
+      { name: 'Pending', value: counts[TaskStatus.PENDING] || 0, color: '#fbbf24' },
+      { name: 'In Progress', value: counts[TaskStatus.IN_PROGRESS] || 0, color: '#3b82f6' },
+      { name: 'Done', value: counts[TaskStatus.DONE] || 0, color: '#22c55e' },
     ].filter(item => item.value > 0);
   }, [allTasks]);
 
@@ -42,13 +45,11 @@ export const Overview: React.FC = () => {
     }));
   }, [allTasks, users]);
 
-  // Widgets Split
+  // Các biến đếm khác
   const todoCount = allTasks.filter(t => t.status === TaskStatus.TODO).length;
   const inProgressCount = allTasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length;
   const pendingCount = allTasks.filter(t => t.status === TaskStatus.PENDING).length;
-  const doneCount = allTasks.filter(t => t.status === TaskStatus.DONE).length;
 
-  // Upcoming Events Logic
   const upcomingTasks = useMemo(() => {
     const now = new Date();
     const threeDaysFromNow = new Date();
@@ -94,22 +95,46 @@ export const Overview: React.FC = () => {
       {/* Main Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Status Distribution (Includes Subtasks)</h3>
-          <div style={{ width: '100%', height: '250px' }}>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Status Distribution</h3>
+
+          {/* SỬA LỖI: Thêm [&_*:focus]:outline-none để tắt viền đen cho TẤT CẢ phần tử con */}
+          <div className="relative w-full h-[250px] [&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
-                <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                  isAnimationActive={true}
+                >
                   {statusData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />)}
                 </Pie>
                 <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend verticalAlign="bottom" height={36} />
               </PieChart>
             </ResponsiveContainer>
+
+            {/* LABEL Ở GIỮA */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+              <span className="text-3xl font-bold text-slate-900 dark:text-white">
+                {completionPercentage}%
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Completed
+              </span>
+            </div>
           </div>
         </div>
+
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Workload by Assignee</h3>
-          <div style={{ width: '100%', height: '250px' }}>
+
+          {/* SỬA LỖI: Thêm [&_*:focus]:outline-none cho Bar Chart */}
+          <div style={{ width: '100%', height: '250px' }} className="[&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={workloadData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
@@ -136,9 +161,6 @@ export const Overview: React.FC = () => {
             {activities.slice(0, 5).map(act => {
               const user = users.find(u => u.id === act.userId);
               const task = tasks.find(t => t.title === act.target);
-
-              // Helper to check if action contains status info
-              // Defensive split to ensure we get a string or empty string, preventing undefined
               const isStatusUpdate = act.action.includes('status');
               const statusFromAction = isStatusUpdate ? (act.action.split('to ')[1] || '').trim() : '';
 
@@ -168,7 +190,7 @@ export const Overview: React.FC = () => {
           </div>
         </div>
 
-        {/* Upcoming Deadlines (RESTORED) */}
+        {/* Upcoming Deadlines */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-500" />

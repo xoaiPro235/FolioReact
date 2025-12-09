@@ -81,7 +81,7 @@ export const TaskModal: React.FC = () => {
     if (!commentText.trim() || readOnly) return;
     addComment(task.id, commentText);
     setCommentText('');
-    addNotification("Comment added", "SUCCESS");
+    //addNotification("Comment added", "SUCCESS");
   };
 
   // Delete Handlers using Custom Dialog
