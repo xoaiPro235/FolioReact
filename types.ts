@@ -71,7 +71,7 @@ export interface Task {
   files?: FileAttachment[];
   projectId: string;
   // Recursive relationship
-  parentTaskId?: string; 
+  parentTaskId?: string;
 }
 
 export interface Project {
@@ -88,6 +88,10 @@ export interface AppNotification {
   read: boolean;
   type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
   createdAt: string;
+  // Action details for clickable notifications
+  actionType?: 'VIEW_PROJECT' | 'VIEW_TASK' | 'VIEW_COMMENT' | 'NONE';
+  targetId?: string; // projectId, taskId, or commentId
+  targetName?: string; // Project name, Task title, etc.
 }
 
 export type Theme = 'light' | 'dark';

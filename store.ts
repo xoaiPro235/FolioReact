@@ -61,6 +61,7 @@ interface AppState {
 
   // Notifications
   addNotification: (msg: string, type?: AppNotification['type']) => void;
+  addDetailedNotification: (notification: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => void;
   markNotificationRead: (id: string) => void;
   dismissNotification: (id: string) => void;
 
@@ -441,6 +442,15 @@ export const useStore = create<AppState>((set, get) => ({
     if (task) {
       const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'commented on', target: task.title, createdAt: new Date().toISOString() };
       set(state => ({ activities: [log, ...state.activities] }));
+
+      // Send detailed notification about new comment
+      get().addDetailedNotification({
+        message: `${currentUser.name} added a comment to "${task.title}"`,
+        type: 'INFO',
+        actionType: 'VIEW_TASK',
+        targetId: taskId,
+        targetName: task.title
+      });
     }
   },
 
@@ -450,7 +460,22 @@ export const useStore = create<AppState>((set, get) => ({
       message: msg,
       read: false,
       type,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      actionType: 'NONE'
+    };
+    set(state => ({ notifications: [newNotif, ...state.notifications] }));
+  },
+
+  addDetailedNotification: (notif) => {
+    const newNotif: AppNotification = {
+      id: `n${Date.now()}`,
+      message: notif.message,
+      read: false,
+      type: notif.type || 'INFO',
+      createdAt: new Date().toISOString(),
+      actionType: notif.actionType || 'NONE',
+      targetId: notif.targetId,
+      targetName: notif.targetName
     };
     set(state => ({ notifications: [newNotif, ...state.notifications] }));
   },
@@ -482,6 +507,8 @@ export const useStore = create<AppState>((set, get) => ({
 
   inviteUserToProject: (user, role) => {
     // TODO: API Call - [POST] /api/projects/{id}/members
+    const { currentProject } = get();
+
     set((state) => {
       if (!state.currentProject) return {};
       if (state.currentProject.members.find(m => m.userId === user.id)) return {};
@@ -491,7 +518,14 @@ export const useStore = create<AppState>((set, get) => ({
         currentProject: { ...state.currentProject, members: [...state.currentProject.members, newMember] }
       };
     });
-    get().addNotification(`Invited ${user.name} as ${role}`, 'SUCCESS');
+
+    get().addDetailedNotification({
+      message: `Invited ${user.name} as ${role} to "${currentProject?.name}"`,
+      type: 'SUCCESS',
+      actionType: 'VIEW_PROJECT',
+      targetId: currentProject?.id,
+      targetName: currentProject?.name
+    });
   },
 
   removeMemberFromProject: (userId) => {
@@ -510,12 +544,19 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
+    const user = get().users.find(u => u.id === userId);
+    const projectName = currentProject?.name;
+
     set((state) => {
       if (!state.currentProject) return {};
       const removedMember = state.currentProject.members.find(m => m.userId === userId);
       const updatedMembers = state.currentProject.members.filter(m => m.userId !== userId);
 
-      const user = state.users.find(u => u.id === userId);
+      // Unassign all tasks assigned to this member
+      const updatedTasks = state.tasks.map(task =>
+        task.assigneeId === userId ? { ...task, assigneeId: undefined } : task
+      );
+
       if (user) {
         const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'removed member', target: user.name, createdAt: new Date().toISOString() };
         state.activities.unshift(log);
@@ -523,14 +564,25 @@ export const useStore = create<AppState>((set, get) => ({
 
       return {
         currentProject: { ...state.currentProject, members: updatedMembers },
+        tasks: updatedTasks,
         activities: state.activities
       };
     });
 
-    const removedMember = currentProject?.members.find(m => m.userId === userId);
-    const user = get().users.find(u => u.id === userId);
+    // Notify project owner (or other admins) about removal with project context
     if (user) {
-      get().addNotification(`Removed ${user.name} from project`, "SUCCESS");
+      get().addDetailedNotification({
+        message: `Removed ${user.name} from "${projectName}"`,
+        type: 'SUCCESS',
+        actionType: 'VIEW_PROJECT',
+        targetId: currentProject?.id,
+        targetName: projectName
+      });
+
+      // TODO: Notify the removed user via email/system notification about removal
+      // In a real app, send notification to the removed user
+      // Example: fetch(`/api/notifications/users/${userId}`, ...)
+      // This could be handled by backend when processing the removal
     }
   },
 

@@ -6,13 +6,14 @@ import { Auth } from './components/Auth';
 import { Workspace } from './components/Workspace';
 import { ProjectView } from './components/ProjectView';
 import { Profile } from './components/Profile';
-import { Bell, LogOut, Layout, User, Moon, Sun, X, Settings, Home, Search, CheckCircle2 } from 'lucide-react';
+import { Bell, LogOut, Layout, User, Moon, Sun, X, Settings, Home, Search, CheckCircle2, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { Task } from './types';
 
 export default function App() {
     const { currentView, currentUser, notifications, logout, theme, toggleTheme, dismissNotification, markNotificationRead, goToWorkspace, goToProfile, globalTaskSearch, setGlobalTaskSearch, setSelectedTask, tasks } = useStore();
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [toastNotifications, setToastNotifications] = useState<any[]>([]);
 
     // Debounce Search
     const [searchTerm, setSearchTerm] = useState(globalTaskSearch);
@@ -24,23 +25,41 @@ export default function App() {
         return () => clearTimeout(handler);
     }, [searchTerm]);
 
+    // Handle toast notifications - show and auto dismiss after 4 seconds
+    useEffect(() => {
+        if (notifications.length === 0) return;
+
+        const latestNotif = notifications[0]; // Most recent is first
+        const alreadyShown = toastNotifications.some(t => t.id === latestNotif.id);
+
+        if (!alreadyShown) {
+            setToastNotifications(prev => [latestNotif, ...prev]);
+
+            // Auto dismiss after 4 seconds
+            setTimeout(() => {
+                setToastNotifications(prev => prev.filter(t => t.id !== latestNotif.id));
+            }, 4000);
+        }
+    }, [notifications]);
+
     const unreadCount = notifications.filter(n => !n.read).length;
 
     // Handle clicking a notification
     const handleNotificationClick = (n: any) => {
         markNotificationRead(n.id);
 
-        // Attempt to link notification to task
-        // In a real app, payload would contain taskId.
-        // Mock logic: find task by loose text matching for demo
-        const foundTask = tasks.find(t => n.message.includes(t.title));
-        if (foundTask) {
-            if (currentView === 'WORKSPACE') {
-                // Should ideally navigate to project first, but global store handles modal state
-                // This works if we are just showing the modal
-                setSelectedTask(foundTask.id);
-            } else {
-                setSelectedTask(foundTask.id);
+        // Handle different action types
+        if (n.actionType === 'VIEW_PROJECT') {
+            // Navigate to project (need to implement loadProjectData)
+            console.log('Navigate to project:', n.targetId);
+        } else if (n.actionType === 'VIEW_TASK') {
+            // Open task modal
+            setSelectedTask(n.targetId);
+        } else if (n.actionType === 'VIEW_COMMENT') {
+            // Find task with this comment and open modal
+            const taskWithComment = tasks.find(t => t.comments.some(c => c.id === n.targetId));
+            if (taskWithComment) {
+                setSelectedTask(taskWithComment.id);
             }
         }
         setIsNotifOpen(false);
@@ -52,6 +71,36 @@ export default function App() {
 
     return (
         <div className={`flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300`}>
+
+            {/* Toast Notifications - Top Right */}
+            <div className="fixed top-6 right-6 z-[100] flex flex-col gap-3 max-w-sm">
+                {toastNotifications.map(toast => (
+                    <div
+                        key={toast.id}
+                        className="animate-in slide-in-from-right-full duration-300 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-4 flex items-start gap-3"
+                    >
+                        <div className={`mt-0.5 flex-shrink-0 ${toast.type === 'SUCCESS' ? 'text-green-500' : toast.type === 'ERROR' ? 'text-red-500' : toast.type === 'WARNING' ? 'text-yellow-500' : 'text-blue-500'}`}>
+                            {toast.type === 'SUCCESS' && <CheckCircle size={20} />}
+                            {toast.type === 'ERROR' && <AlertCircle size={20} />}
+                            {toast.type === 'WARNING' && <AlertCircle size={20} />}
+                            {toast.type === 'INFO' && <Info size={20} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-tight">{toast.message}</p>
+                            {toast.targetName && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">📌 {toast.targetName}</p>}
+                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+                            }}
+                            className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                ))}
+            </div>
 
             {/* Sidebar - Global */}
             <aside className="w-16 sm:w-20 bg-[#0f172a] text-slate-400 flex flex-col items-center py-6 flex-shrink-0 z-30 shadow-xl">
@@ -126,15 +175,16 @@ export default function App() {
                                             {notifications.length > 0 ? notifications.map(n => (
                                                 <div
                                                     key={n.id}
-                                                    className={`p-3 border-b border-slate-50 dark:border-slate-800 flex gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer ${!n.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-                                                    onClick={() => handleNotificationClick(n)}
+                                                    className={`p-4 border-b border-slate-50 dark:border-slate-800 flex gap-3 ${n.actionType !== 'NONE' ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer' : ''} ${!n.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                                                    onClick={() => n.actionType !== 'NONE' && handleNotificationClick(n)}
                                                 >
-                                                    <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'SUCCESS' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
-                                                    <div className="flex-1">
-                                                        <p className="text-sm text-slate-800 dark:text-slate-200 leading-tight">{n.message}</p>
-                                                        <p className="text-xs text-slate-400 mt-1">{new Date(n.createdAt).toLocaleTimeString()}</p>
+                                                    <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'SUCCESS' ? 'bg-green-500' : n.type === 'ERROR' ? 'bg-red-500' : n.type === 'WARNING' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-tight">{n.message}</p>
+                                                        {n.targetName && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">📌 {n.targetName}</p>}
+                                                        <p className="text-xs text-slate-400 mt-1.5">{new Date(n.createdAt).toLocaleTimeString()}</p>
                                                     </div>
-                                                    <div className="flex flex-col items-center gap-1">
+                                                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
                                                         {!n.read && (
                                                             <button onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }} className="text-blue-500 hover:text-blue-700" title="Mark as read">
                                                                 <CheckCircle2 size={14} />
