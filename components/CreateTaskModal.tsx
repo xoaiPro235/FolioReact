@@ -1,0 +1,191 @@
+
+import React, { useState, useEffect } from 'react';
+import { Task, TaskStatus, Priority } from '../types';
+import { useStore } from '../store';
+import { X, Calendar, User, AlignLeft, Flag, CheckCircle2 } from 'lucide-react';
+
+interface CreateTaskModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  parentTaskId?: string;
+  initialStatus?: TaskStatus; // New prop for Kanban creation
+}
+
+export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, parentTaskId, initialStatus }) => {
+  const { currentProject, currentUser, users, addTask, addNotification } = useStore();
+  
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<TaskStatus>(initialStatus || TaskStatus.TODO);
+  const [priority, setPriority] = useState<Priority>(Priority.MEDIUM);
+  const [assigneeId, setAssigneeId] = useState<string>(currentUser?.id || '');
+  const [startDate, setStartDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+
+  // Update status if initialStatus changes
+  useEffect(() => {
+    if(initialStatus) setStatus(initialStatus);
+  }, [initialStatus]);
+
+  if (!isOpen || !currentProject) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    // TODO: API INTEGRATION [POST] /api/tasks
+    const newTask: Task = {
+      id: `t${Date.now()}`,
+      projectId: currentProject.id,
+      parentTaskId,
+      title,
+      description,
+      status,
+      priority,
+      assigneeId: assigneeId || undefined,
+      startDate: startDate || undefined,
+      dueDate: dueDate || undefined,
+      tags: [],
+      comments: [],
+      createdAt: new Date().toISOString()
+    };
+
+    addTask(newTask);
+    addNotification(parentTaskId ? 'Subtask created successfully' : 'Task created successfully', 'SUCCESS');
+    
+    // Reset Form
+    setTitle('');
+    setDescription('');
+    setStatus(TaskStatus.TODO);
+    setPriority(Priority.MEDIUM);
+    setStartDate('');
+    setDueDate('');
+    
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
+      
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            {parentTaskId ? <><CheckCircle2 className="w-5 h-5 text-blue-500"/> Add Subtask</> : 'Create New Task'}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Title</label>
+            <input 
+              autoFocus
+              type="text" 
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="What needs to be done?"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
+              <AlignLeft className="w-4 h-4"/> Description
+            </label>
+            <textarea 
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={4}
+              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+              placeholder="Add details..."
+            />
+          </div>
+
+          {/* Grid Layout for Meta Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
+              <select 
+                value={status}
+                onChange={e => setStatus(e.target.value as TaskStatus)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                {Object.values(TaskStatus).map(s => (
+                  <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Flag className="w-4 h-4"/> Priority</label>
+              <select 
+                value={priority}
+                onChange={e => setPriority(e.target.value as Priority)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                {Object.values(Priority).map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Assignee */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><User className="w-4 h-4"/> Assignee</label>
+              <select 
+                value={assigneeId}
+                onChange={e => setAssigneeId(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Unassigned</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Dates */}
+            <div className="flex gap-3">
+               <div className="flex-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4"/> Start</label>
+                  <input 
+                    type="date" 
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+               </div>
+               <div className="flex-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4"/> Due</label>
+                  <input 
+                    type="date" 
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+               </div>
+            </div>
+
+          </div>
+        </form>
+
+        <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-2xl">
+           <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors">Cancel</button>
+           <button onClick={handleSubmit} disabled={!title.trim()} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:shadow-none transition-all">
+             {parentTaskId ? 'Add Subtask' : 'Create Task'}
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};

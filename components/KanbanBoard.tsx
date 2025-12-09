@@ -1,0 +1,217 @@
+
+import React, { useState } from 'react';
+import { useStore } from '../store';
+import { Task, TaskStatus, Role, Priority } from '../types';
+import { 
+  DndContext, 
+  DragOverlay, 
+  useDraggable, 
+  useDroppable, 
+  DragEndEvent,
+  closestCorners,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Plus, Edit2, CheckSquare } from 'lucide-react';
+import { STATUS_CONFIG, PRIORITY_CONFIG } from './Shared';
+import { CreateTaskModal } from './CreateTaskModal';
+
+const KanbanCard = ({ task, onClick, canEdit }: { task: Task; onClick: () => void; canEdit: boolean }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    data: { task },
+    disabled: !canEdit,
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined;
+
+  const { users, tasks } = useStore();
+  const assignee = users.find(u => u.id === task.assigneeId);
+  
+  const subtasks = tasks.filter(t => t.parentTaskId === task.id);
+  const completedSubtasks = subtasks.filter(s => s.status === TaskStatus.DONE).length;
+  const totalSubtasks = subtasks.length;
+
+  // Use Shared Config for styles
+  const PriorityIcon = PRIORITY_CONFIG[task.priority].icon;
+
+  if (isDragging) {
+    return (
+      <div ref={setNodeRef} style={style} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border-2 border-blue-500 opacity-50 h-[140px]" />
+    );
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all group relative flex flex-col gap-3 ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+      onClick={onClick}
+    >
+      <div className="flex justify-between items-start gap-2">
+        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug">{task.title}</h4>
+        {canEdit && (
+           <button onClick={(e) => { e.stopPropagation(); onClick(); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 transition-opacity bg-slate-50 dark:bg-slate-700 rounded-md">
+               <Edit2 className="w-3.5 h-3.5" />
+           </button>
+        )}
+      </div>
+      
+      {/* Subtask Preview */}
+      {totalSubtasks > 0 && (
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+             <CheckSquare className="w-3.5 h-3.5" />
+             <span>{completedSubtasks}/{totalSubtasks} Subtasks</span>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 dark:border-slate-700/50">
+        <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border font-medium ${PRIORITY_CONFIG[task.priority].color}`}>
+           <PriorityIcon className="w-3.5 h-3.5" />
+           {task.priority}
+        </div>
+        {assignee && (
+           <img src={assignee.avatar} alt={assignee.name} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 shadow-sm" title={assignee.name} />
+        )}
+      </div>
+    </div>
+  );
+};
+
+const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) => {
+  const { setNodeRef } = useDroppable({ id: status });
+  const config = STATUS_CONFIG[status as TaskStatus];
+
+  return (
+    <div className="flex flex-col h-full min-w-[350px] flex-1">
+      <div className={`flex items-center justify-between mb-4 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl border-t-4 shadow-sm ${config.color.split(' ')[2]}`}>
+        <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 text-base">
+          {config.label}
+          <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded-full text-xs font-mono">{tasks.length}</span>
+        </h3>
+      </div>
+      
+      <div ref={setNodeRef} className="flex-1 bg-slate-100/50 dark:bg-slate-900/30 rounded-2xl p-3 space-y-3 overflow-y-auto border border-dashed border-slate-200 dark:border-slate-800 relative group/column">
+         <SortableContext items={tasks.map((t: Task) => t.id)} strategy={verticalListSortingStrategy}>
+            {tasks.map((task: Task) => (
+              <KanbanCard 
+                key={task.id} 
+                task={task} 
+                onClick={() => onTaskClick(task.id)}
+                canEdit={canEdit}
+              />
+            ))}
+         </SortableContext>
+         
+         {/* Contextual Create Button */}
+         {canEdit && (
+            <button 
+                onClick={() => onCreate(status)}
+                className="w-full py-3 flex items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm transition-all text-sm font-bold mt-2 opacity-0 group-hover/column:opacity-100"
+            >
+                <Plus className="w-5 h-5" /> Create New Task
+            </button>
+         )}
+      </div>
+    </div>
+  );
+};
+
+export const KanbanBoard: React.FC = () => {
+  const { tasks, updateTaskStatus, getUserRole, globalTaskSearch, setSelectedTask } = useStore();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
+  // Create Modal State specific to Kanban contextual add
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [initialStatus, setInitialStatus] = useState<TaskStatus>(TaskStatus.TODO);
+
+  const role = getUserRole();
+  const canEdit = role !== Role.VIEWER;
+
+  // Filter Tasks
+  const rootTasks = tasks.filter(t => 
+      !t.parentTaskId && 
+      (t.title.toLowerCase().includes(globalTaskSearch.toLowerCase()) || 
+       t.status.toLowerCase().includes(globalTaskSearch.toLowerCase()))
+  );
+
+  const columns = Object.values(TaskStatus);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!canEdit) return;
+    
+    // Prevent logging/update if dropped in same column
+    if (over) {
+        // If dropped over a container
+        const isContainer = Object.values(TaskStatus).includes(over.id as TaskStatus);
+        const currentTask = active.data.current?.task as Task;
+        
+        if (isContainer) {
+            if (currentTask.status !== over.id) {
+                updateTaskStatus(active.id as string, over.id as TaskStatus);
+            }
+        } else {
+            // If dropped over another task
+            const overTask = tasks.find(t => t.id === over.id);
+            if (overTask && currentTask.status !== overTask.status) {
+                updateTaskStatus(active.id as string, overTask.status);
+            }
+        }
+    }
+    setActiveId(null);
+  };
+
+  const handleCreateClick = (status: TaskStatus) => {
+      setInitialStatus(status);
+      setIsCreateOpen(true);
+  };
+
+  const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
+
+  return (
+    <div className="h-full flex flex-col w-full">
+      <DndContext 
+        sensors={sensors} 
+        collisionDetection={closestCorners} 
+        onDragStart={(e) => canEdit && setActiveId(e.active.id as string)}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex h-full w-full gap-6 overflow-x-auto pb-4 px-2">
+          {columns.map(status => (
+            <KanbanColumn 
+              key={status} 
+              status={status} 
+              tasks={rootTasks.filter(t => t.status === status)}
+              onTaskClick={setSelectedTask}
+              canEdit={canEdit}
+              onCreate={handleCreateClick}
+            />
+          ))}
+        </div>
+        <DragOverlay>
+          {activeTask ? <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-2xl border-2 border-blue-500 w-[350px] h-[140px]" /> : null}
+        </DragOverlay>
+      </DndContext>
+
+      {isCreateOpen && (
+          <CreateTaskModal 
+              isOpen={isCreateOpen}
+              onClose={() => setIsCreateOpen(false)}
+              initialStatus={initialStatus}
+          />
+      )}
+    </div>
+  );
+};
