@@ -315,3 +315,19 @@ export const ConfirmDialog: React.FC<{
         document.body
     );
 };
+export const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
+    if (!priority) return null;
+
+    // Tìm config dựa trên priority (đảm bảo uppercase để khớp key)
+    const pKey = priority.toUpperCase();
+    // @ts-ignore
+    const config = PRIORITY_CONFIG[pKey] || PRIORITY_CONFIG['MEDIUM'];
+    const Icon = config.icon;
+
+    return (
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border mx-1 uppercase tracking-wide ${config.color}`}>
+            <Icon className="w-3 h-3" />
+            {priority}
+        </span>
+    );
+};

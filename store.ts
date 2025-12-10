@@ -277,7 +277,8 @@ export const useStore = create<AppState>((set, get) => ({
     // TODO: API Call - [PATCH] /api/tasks/{id}
     // TODO: SignalR - hubConnection.invoke("UpdateTask", taskId, updates);
 
-    const task = get().tasks.find(t => t.id === taskId);
+    const { currentUser, users, tasks } = get(); // Lấy thêm users để tra cứu tên
+    const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
     // Check if anything actually changed (Spam Prevention)
@@ -288,22 +289,66 @@ export const useStore = create<AppState>((set, get) => ({
 
     if (!hasChanges) return;
 
+    // Cập nhật State
     set((state) => ({
       tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
     }));
 
-    // Add Activity Log (Generic)
-    const { currentUser } = get();
+    // GHI LOG CHI TIẾT
     if (currentUser && Object.keys(updates).length > 0) {
       const key = Object.keys(updates)[0];
       let actionText = `updated ${key} on`;
 
-      // Special case for status formatting in logs
-      if (key === 'status') {
-        actionText = `updated status to ${updates.status}`;
+      switch (key) {
+        case 'status':
+          // Ví dụ: updated status to IN_PROGRESS
+          actionText = `updated status to ${updates.status}`;
+          break;
+
+        case 'priority':
+          // Ví dụ: updated priority to HIGH
+          actionText = `updated priority to ${updates.priority}`;
+          break;
+
+        case 'assigneeId':
+          const newAssignee = users.find(u => u.id === updates.assigneeId);
+          // Ví dụ: assigned to Alice Johnson
+          actionText = newAssignee
+            ? `assigned to ${newAssignee.name}`
+            : `removed assignee from`;
+          break;
+
+        case 'startDate':
+          // Ví dụ: set start date to 2025-12-20
+          actionText = `set start date to ${updates.startDate}`;
+          break;
+
+        case 'dueDate':
+          // Ví dụ: set due date to 2025-12-25
+          actionText = `set due date to ${updates.dueDate}`;
+          break;
+
+        case 'title':
+          // Ví dụ: renamed task
+          actionText = `renamed task`;
+          break;
+
+        case 'description':
+          actionText = `updated description of`;
+          break;
+
+        default:
+          actionText = `updated ${key} on`;
       }
 
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: actionText, target: task.title, createdAt: new Date().toISOString() };
+      const log: ActivityLog = {
+        id: `act-${Date.now()}`,
+        userId: currentUser.id,
+        action: actionText,
+        target: task.title,
+        createdAt: new Date().toISOString()
+      };
+
       set(state => ({ activities: [log, ...state.activities] }));
     }
   },

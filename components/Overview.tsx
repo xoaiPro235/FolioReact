@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { TaskStatus, Task } from '../types';
-import { STATUS_CONFIG, StatusBadge } from './Shared';
+import { STATUS_CONFIG, StatusBadge, PriorityBadge } from './Shared'; // Đã thêm PriorityBadge
 import { Activity, Calendar, Clock, AlertCircle } from 'lucide-react';
 
 export const Overview: React.FC = () => {
@@ -13,7 +13,7 @@ export const Overview: React.FC = () => {
 
   const allTasks = tasks;
 
-  // 1. Khai báo doneCount
+  // Tính toán phần trăm hoàn thành
   const totalTasks = allTasks.length;
   const doneCount = allTasks.filter(t => t.status === TaskStatus.DONE).length;
   const completionPercentage = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
@@ -45,7 +45,7 @@ export const Overview: React.FC = () => {
     }));
   }, [allTasks, users]);
 
-  // Các biến đếm khác
+  // Các biến đếm cho thẻ Summary
   const todoCount = allTasks.filter(t => t.status === TaskStatus.TODO).length;
   const inProgressCount = allTasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length;
   const pendingCount = allTasks.filter(t => t.status === TaskStatus.PENDING).length;
@@ -97,7 +97,7 @@ export const Overview: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Status Distribution</h3>
 
-          {/* SỬA LỖI: Thêm [&_*:focus]:outline-none để tắt viền đen cho TẤT CẢ phần tử con */}
+          {/* Biểu đồ tròn - Tắt focus outline */}
           <div className="relative w-full h-[250px] [&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
@@ -118,7 +118,7 @@ export const Overview: React.FC = () => {
               </PieChart>
             </ResponsiveContainer>
 
-            {/* LABEL Ở GIỮA */}
+            {/* Label % ở giữa */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
               <span className="text-3xl font-bold text-slate-900 dark:text-white">
                 {completionPercentage}%
@@ -133,7 +133,7 @@ export const Overview: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Workload by Assignee</h3>
 
-          {/* SỬA LỖI: Thêm [&_*:focus]:outline-none cho Bar Chart */}
+          {/* Biểu đồ cột - Tắt focus outline */}
           <div style={{ width: '100%', height: '250px' }} className="[&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={workloadData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
@@ -151,7 +151,7 @@ export const Overview: React.FC = () => {
       {/* Widgets Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Recent Activity */}
+        {/* Recent Activity - ĐÃ CẬP NHẬT PRIORITY BADGE */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5 text-orange-500" />
@@ -161,8 +161,14 @@ export const Overview: React.FC = () => {
             {activities.slice(0, 5).map(act => {
               const user = users.find(u => u.id === act.userId);
               const task = tasks.find(t => t.title === act.target);
-              const isStatusUpdate = act.action.includes('status');
+
+              // Logic Status
+              const isStatusUpdate = act.action.includes('status to');
               const statusFromAction = isStatusUpdate ? (act.action.split('to ')[1] || '').trim() : '';
+
+              // Logic Priority
+              const isPriorityUpdate = act.action.includes('priority to');
+              const priorityFromAction = isPriorityUpdate ? (act.action.split('to ')[1] || '').trim() : '';
 
               return (
                 <div
@@ -174,11 +180,16 @@ export const Overview: React.FC = () => {
                   <div>
                     <p className="text-sm text-slate-800 dark:text-slate-200 leading-snug">
                       <span className="font-semibold">{user?.name}</span>
+
+                      {/* Render Badge tùy loại */}
                       {isStatusUpdate && statusFromAction ? (
                         <> updated status to <StatusBadge status={statusFromAction} /></>
+                      ) : isPriorityUpdate && priorityFromAction ? (
+                        <> updated priority to <PriorityBadge priority={priorityFromAction} /></>
                       ) : (
                         <> {act.action} </>
                       )}
+
                       <span className="font-medium text-blue-600 dark:text-blue-400">"{act.target}"</span>
                     </p>
                     <p className="text-xs text-slate-400 mt-1">{new Date(act.createdAt).toLocaleString()}</p>
