@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { Task, TaskStatus, Priority } from '../types';
@@ -18,7 +17,7 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
     const [newTitle, setNewTitle] = useState('');
     const [newStatus, setNewStatus] = useState<TaskStatus>(TaskStatus.TODO);
     const [newPriority, setNewPriority] = useState<Priority>(Priority.MEDIUM);
-    const [newAssignee, setNewAssignee] = useState('');
+    const [newAssignee, setNewAssignee] = useState(''); // Mặc định Unassigned
 
     const { tasks } = useStore();
 
@@ -32,10 +31,11 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
                 title: newTitle,
                 status: newStatus,
                 priority: newPriority,
-                assigneeId: newAssignee
+                assigneeId: newAssignee || undefined // Gửi undefined nếu rỗng
             });
             setNewTitle('');
             setNewStatus(TaskStatus.TODO);
+            setNewAssignee(''); // Reset về Unassigned
         }
     };
 
@@ -56,13 +56,15 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
                     </div>
                 </td>
                 <td className="px-6 py-4">
-                    <UserSelect
-                        users={projectMembers}
-                        selectedUserId={task.assigneeId}
-                        onChange={(userId) => onAssigneeChange(task.id, userId)}
-                        readOnly={!canEdit}
-                        className="w-40"
-                    />
+                    {/* SỬA LỖI: Bọc trong div cố định chiều rộng */}
+                    <div className="w-40">
+                        <UserSelect
+                            users={projectMembers}
+                            selectedUserId={task.assigneeId}
+                            onChange={(userId) => onAssigneeChange(task.id, userId)}
+                            readOnly={!canEdit}
+                        />
+                    </div>
                 </td>
                 <td className="px-6 py-4"><StatusSelect value={task.status} onChange={(v) => onPatch(task.id, { status: v })} readOnly={!canEdit} /></td>
                 <td className="px-6 py-4"><PrioritySelect value={task.priority} onChange={(v) => onPatch(task.id, { priority: v })} readOnly={!canEdit} /></td>
@@ -108,12 +110,17 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
                                         <div className="w-6 border-b-2 border-slate-200 dark:border-slate-700 h-3 -mt-3"></div>
                                         <span
                                             className={`text-sm cursor-pointer hover:text-blue-600 ${st.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}
-                                            onClick={() => onSelect(st.id)} // Click opens subtask modal
+                                            onClick={() => onSelect(st.id)}
                                         >
                                             {st.title}
                                         </span>
                                     </div>
-                                    <UserSelect users={projectMembers} selectedUserId={st.assigneeId} onChange={(id) => onAssigneeChange(st.id, id)} className="w-32" />
+
+                                    {/* SỬA LỖI: Bọc UserSelect subtask */}
+                                    <div className="w-32 flex-shrink-0">
+                                        <UserSelect users={projectMembers} selectedUserId={st.assigneeId} onChange={(id) => onAssigneeChange(st.id, id)} />
+                                    </div>
+
                                     <StatusSelect minimal value={st.status} onChange={(v) => onPatch(st.id, { status: v })} />
                                     <PrioritySelect minimal value={st.priority} onChange={(v) => onPatch(st.id, { priority: v })} />
 
@@ -156,7 +163,12 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
                                         onChange={e => setNewTitle(e.target.value)}
                                         className="bg-transparent border-none text-sm focus:ring-0 placeholder:text-slate-400 dark:text-slate-300 flex-1 min-w-[200px] outline-none"
                                     />
-                                    <UserSelect users={projectMembers} selectedUserId={newAssignee} onChange={setNewAssignee} className="w-32" />
+
+                                    {/* SỬA LỖI: Bọc UserSelect trong Quick Add Form */}
+                                    <div className="w-36 flex-shrink-0">
+                                        <UserSelect users={projectMembers} selectedUserId={newAssignee} onChange={setNewAssignee} />
+                                    </div>
+
                                     <StatusSelect value={newStatus} onChange={setNewStatus} />
                                     <PrioritySelect value={newPriority} onChange={setNewPriority} />
                                     <button type="submit" disabled={!newTitle.trim()} className="bg-blue-600 text-white p-1 rounded hover:bg-blue-700 disabled:opacity-50">
@@ -191,7 +203,6 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
     );
 
     const handleQuickAddSubtask = (parentTaskId: string, data: any) => {
-        // Uses the generic addTask but links to parent
         if (!currentProject) return;
         const task: Task = {
             id: `t${Date.now()}`,
@@ -222,7 +233,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
     return (
         <>
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm min-h-[400px]">
-                <div className="overflow-x-auto pb-32"> {/* Added Padding Bottom for Dropdown space */}
+                <div className="overflow-x-auto pb-32">
                     <table className="w-full text-left border-collapse min-w-[1000px]">
                         <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 uppercase">
                             <tr>
@@ -254,7 +265,6 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
                 </div>
             </div>
 
-            {/* Custom Confirmation Dialog */}
             <ConfirmDialog
                 isOpen={!!taskToDelete}
                 onClose={() => setTaskToDelete(null)}
