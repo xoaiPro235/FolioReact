@@ -603,3 +603,79 @@ public NotificationsHub(INotificationService notificationService)
 - Luôn gọi `stopSignalR()` khi logout
 - Unsubscribe từ events khi component unmount
 - Kiểm tra các TimeOut không được cleanup
+
+
+Câu trả lời ngắn gọn là: Trong giai đoạn hiện tại (Prototype/Mock Data), lọc ở Frontend là chấp nhận được. Nhưng để đưa vào thực tế (Production), bạn BẮT BUỘC phải xử lý ở Backend.
+
+Dưới đây là phân tích chi tiết tại sao và lộ trình để bạn nâng cấp:
+
+1. Tại sao hiện tại lọc Frontend (như bạn vừa làm) là ổn?
+Trong file store.ts, khi đăng nhập, ứng dụng đang gọi fetchUsers() và tải toàn bộ danh sách người dùng vào state users.
+
+Dữ liệu có sẵn: Vì Store đã chứa tất cả user, việc lọc lại ở CreateTaskModal bằng projectMembers là nhanh nhất, không cần gọi thêm API.
+
+Quy mô nhỏ: Với dữ liệu mẫu (Mock Data) khoảng 10-20 người, việc filter diễn ra tức thì, không ảnh hưởng hiệu năng.
+
+2. Tại sao nên chuyển sang Backend khi làm thật?
+Khi ứng dụng của bạn có 10,000 người dùng:
+
+Hiệu năng (Performance): Bạn không thể tải danh sách 10,000 người về máy khách (store.users) chỉ để lọc ra 5 người trong dự án. Nó sẽ làm treo ứng dụng.
+
+Bảo mật (Security): Nếu tải hết về Frontend, một người dùng biết kỹ thuật (F12) có thể xem được danh sách toàn bộ nhân viên công ty, bao gồm email và thông tin cá nhân, ngay cả khi họ không cùng dự án.
+
+Tính đúng đắn: Backend là nơi duy nhất biết chính xác ai có quyền được gán task tại thời điểm đó (ví dụ: nhân viên vừa nghỉ việc 1 giây trước).
+
+3. Giải pháp nâng cấp (Best Practice)
+Khi bạn tích hợp API thật (theo hướng dẫn trong API_INTEGRATION_GUIDE.md), hãy thay đổi logic như sau:
+
+Bước 1: API Backend
+Backend cần cung cấp 1 endpoint trả về thành viên của dự án cụ thể, ví dụ: GET /api/projects/{projectId}/members -> Trả về danh sách User[] chi tiết.
+
+Bước 2: Cập nhật Store hoặc Component
+Thay vì dùng users global (danh sách tất cả mọi người), bạn sẽ fetch danh sách thành viên khi mở Project.
+
+Cách làm (Tương lai):
+
+Trong store.ts, thêm state projectMembers:
+
+TypeScript
+
+// store.ts
+interface AppState {
+  // ...
+  projectUsers: User[]; // Danh sách user chỉ thuộc project hiện tại
+  // ...
+}
+
+// Khi loadProjectData
+loadProjectData: async (projectId) => {
+    // Gọi API lấy thông tin Project
+    // Gọi API lấy Tasks
+    // Gọi API lấy Members (Backend đã lọc sẵn)
+    const members = await fetchProjectMembers(projectId); 
+    set({ projectUsers: members, ... });
+}
+Trong CreateTaskModal.tsx, bạn sẽ dùng trực tiếp list này:
+
+TypeScript
+
+// CreateTaskModal.tsx
+// Không cần filter thủ công nữa
+const { projectUsers } = useStore(); 
+
+// Dùng luôn
+<UserSelect users={projectUsers} ... />
+Kết luận
+Hiện tại bạn giữ nguyên code Frontend filtering vừa sửa vì nó hoạt động tốt với kiến trúc hiện tại của Mini-Jira Pro.
+
+Tuy nhiên, tôi khuyên bạn nên thêm một comment vào code để nhắc nhở bản thân sau này:
+
+TypeScript
+
+// components/CreateTaskModal.tsx
+
+// TODO: Optimization - Khi có API thật, hãy fetch danh sách thành viên từ endpoint /api/projects/:id/members 
+// thay vì filter từ danh sách global users để đảm bảo bảo mật và hiệu năng.
+const projectMembers = users.filter(u =>
+  currentProject?.members.some(m => m.userId === u.id)
+);
