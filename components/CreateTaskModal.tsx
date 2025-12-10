@@ -21,7 +21,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [status, setStatus] = useState<TaskStatus>(initialStatus || TaskStatus.TODO);
   const [priority, setPriority] = useState<Priority>(Priority.MEDIUM);
 
-  // LOGIC SỬA ĐỔI: Mặc định là '' (Unassigned) thay vì currentUser.id
+  // Logic: Mặc định là '' (Unassigned)
   const [assigneeId, setAssigneeId] = useState<string>('');
 
   const [startDate, setStartDate] = useState('');
@@ -89,7 +89,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
 
-          {/* Title */}
+          {/* Title - Giữ block vì không có flex */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Title</label>
             <input
@@ -103,9 +103,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             />
           </div>
 
-          {/* Description */}
+          {/* Description - SỬA LỖI: Xóa 'block', giữ 'flex' */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
               <AlignLeft className="w-4 h-4" /> Description
             </label>
             <textarea
@@ -120,7 +120,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           {/* Grid Layout for Meta Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            {/* Status - ĐÃ SỬA DÙNG COMPONENT ĐẸP */}
+            {/* Status - Giữ block vì không có flex */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
               <StatusSelect
@@ -130,9 +130,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               />
             </div>
 
-            {/* Priority - ĐÃ SỬA DÙNG COMPONENT ĐẸP */}
+            {/* Priority - SỬA LỖI: Xóa 'block', giữ 'flex' */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
                 <Flag className="w-4 h-4" /> Priority
               </label>
               <PrioritySelect
@@ -142,7 +142,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               />
             </div>
 
-            {/* Assignee - ĐÃ SỬA: DÙNG USERSELECT VÀ LỌC PROJECT MEMBERS */}
+            {/* Assignee - Giữ block vì không có flex */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assignee</label>
               <UserSelect
@@ -156,7 +156,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             {/* Dates */}
             <div className="flex gap-3 md:col-span-2">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Start</label>
+                {/* SỬA LỖI: Xóa 'block', giữ 'flex' */}
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Start</label>
                 <input
                   type="date"
                   value={startDate}
@@ -165,7 +166,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Due</label>
+                {/* SỬA LỖI: Xóa 'block', giữ 'flex' */}
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Due</label>
                 <input
                   type="date"
                   value={dueDate}
