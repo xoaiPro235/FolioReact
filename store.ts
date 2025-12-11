@@ -101,41 +101,93 @@ export const useStore = create<AppState>((set, get) => ({
 
   login: async (email, password) => {
     set({ isLoading: true });
+    // TODO: API Call - [POST] /api/auth/login
     try {
-      // TODO: API Call - [POST] /api/auth/login
+      // Hàm loginUser trong api.ts đã được thiết kế để throw Error nếu sai pass
       const user = await loginUser(email, password);
+
       if (!user) {
         throw new Error('Login failed');
       }
+
+      // ... logic load data giữ nguyên ...
       const [projects, users] = await Promise.all([
         fetchProjects(user.id),
         fetchUsers()
       ]);
+
       set({ currentUser: user, projects, users, currentView: 'WORKSPACE', isLoading: false });
     } catch (e) {
       set({ isLoading: false });
-      const errorMessage = e instanceof Error ? e.message : "Login failed";
-      throw new Error(errorMessage);
+      // Ném lỗi ra để component Auth.tsx bắt được
+      throw new Error("Incorrect email or password.");
     }
   },
 
   register: async (data) => {
     set({ isLoading: true });
+    
     // TODO: API Call - [POST] /api/auth/register
-    await new Promise(r => setTimeout(r, 800)); // Mock delay
+    //const newUser = await registerUser(data);
+    // Giả lập độ trễ mạng
+    await new Promise(r => setTimeout(r, 800));
 
-    const newUser: User = {
-      id: `u${Date.now()}`,
-      name: `${data.firstName} ${data.lastName}`,
-      email: data.email,
-      avatar: `https://ui-avatars.com/api/?name=${data.firstName}+${data.lastName}&background=random`,
-      title: 'New Member',
-      isOnline: true
-    };
+    try {
+      // 1. KIỂM TRA TRÙNG EMAIL (Logic Mock)
+      // Trong thực tế, Backend API sẽ trả về lỗi 409 Conflict
+      const emailExists = MOCK_USERS.some(u => u.email.toLowerCase() === data.email.toLowerCase());
 
-    // Auto login
-    set({ currentUser: newUser, projects: [], users: MOCK_USERS, currentView: 'WORKSPACE', isLoading: false });
+      if (emailExists) {
+        throw new Error("This email address is already in use.");
+      }
+
+      // 2. Nếu không trùng thì tạo user mới
+      const newUser: User = {
+        id: `u${Date.now()}`,
+        name: `${data.firstName} ${data.lastName}`,
+        email: data.email,
+        avatar: `https://ui-avatars.com/api/?name=${data.firstName}+${data.lastName}&background=random`,
+        title: 'New Member',
+        isOnline: true
+      };
+
+      // Auto login luôn sau khi đăng ký
+      set({ currentUser: newUser, projects: [], users: [...MOCK_USERS, newUser], currentView: 'WORKSPACE', isLoading: false });
+      get().addNotification(`Welcome ${newUser.name}! Account created successfully.`, 'SUCCESS');
+
+    } catch (error) {
+      set({ isLoading: false });
+      throw error; // Ném lỗi ra để Auth.tsx hiển thị
+    }
   },
+  // register: async (data) => {
+  //   set({ isLoading: true });
+
+  //   try {
+  //     // --- GỌI API THẬT ---
+  //     // Không cần setTimeout giả lập nữa vì gọi mạng đã tốn thời gian rồi
+  //     const newUser = await registerUser(data);
+
+  //     // --- NẾU THÀNH CÔNG (Backend trả về 200 OK) ---
+  //     // Backend đã tạo user xong, giờ mình cập nhật vào Store để đăng nhập luôn
+  //     set({
+  //       currentUser: newUser,
+  //       projects: [],
+  //       users: [], // Lúc này chưa có users khác, sẽ load sau
+  //       currentView: 'WORKSPACE',
+  //       isLoading: false
+  //     });
+
+  //     get().addNotification(`Welcome ${newUser.name}! Account created successfully.`, 'SUCCESS');
+
+  //   } catch (error: any) {
+  //     set({ isLoading: false });
+
+  //     // Ném lỗi ra để component Auth.tsx hiển thị thông báo đỏ
+  //     // Lỗi này chính là cái "throw new Error" từ api.ts
+  //     throw error;
+  //   }
+  // },
 
   logout: () => {
     set({ currentUser: null, currentView: 'AUTH', currentProject: null });

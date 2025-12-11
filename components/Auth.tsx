@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { Layout, AlertCircle } from 'lucide-react';
@@ -6,7 +5,7 @@ import { Layout, AlertCircle } from 'lucide-react';
 export const Auth: React.FC = () => {
   const { login, register, isLoading } = useStore();
   const [isLogin, setIsLogin] = useState(true);
-  const [loginError, setLoginError] = useState('');
+  const [loginError, setLoginError] = useState(''); // State dùng để hiện thông báo lỗi đỏ
 
   // Login State
   const [email, setEmail] = useState('alice@minijira.app');
@@ -20,29 +19,37 @@ export const Auth: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
+    setLoginError(''); // Xóa lỗi cũ trước khi submit mới
 
-    if (isLogin) {
-      if (!email || !password) {
-        setLoginError('Email and password are required');
-        return;
+    try {
+      if (isLogin) {
+        if (!email || !password) {
+          setLoginError('Vui lòng nhập đầy đủ email và mật khẩu');
+          return;
+        }
+        // Gọi hàm login, nếu sai pass nó sẽ nhảy xuống catch
+        await login(email, password);
+      } else {
+        // Gọi hàm register, nếu trùng email nó sẽ nhảy xuống catch
+        await register({
+          firstName: regFirstName,
+          lastName: regLastName,
+          email: regEmail,
+          password: regPassword // (Lưu ý: Mock Hash chỉ để minh họa, thực tế ko làm ở frontend)
+        });
       }
-      await login(email, password);
-    } else {
-      // Mock Hash
-      const hashedPassword = btoa(regPassword).split('').reverse().join('');
-      register({
-        firstName: regFirstName,
-        lastName: regLastName,
-        email: regEmail,
-        password: hashedPassword
-      });
+    } catch (error: any) {
+      // Bắt lỗi từ Store ném ra và hiển thị lên UI
+      console.error("Auth Error:", error);
+      // Lấy message từ Error object (VD: "Invalid password" hoặc "Email này đã được sử dụng")
+      setLoginError(error.message || "An error occurred. Please try again..");
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+        {/* ... (Phần Header Logo giữ nguyên) ... */}
         <div className="bg-blue-600 p-8 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-2xl mx-auto flex items-center justify-center backdrop-blur-sm mb-4">
             <Layout className="w-8 h-8 text-white" />
@@ -57,6 +64,16 @@ export const Auth: React.FC = () => {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ... (Các input giữ nguyên) ... */}
+
+            {/* Phần hiển thị lỗi đã có sẵn, giờ nó sẽ hoạt động nhờ setLoginError */}
+            {loginError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-600 dark:text-red-400">{loginError}</p>
+              </div>
+            )}
+
             {isLogin ? (
               <>
                 <div>
@@ -65,7 +82,7 @@ export const Auth: React.FC = () => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     placeholder="name@company.com"
                     required
                   />
@@ -81,12 +98,6 @@ export const Auth: React.FC = () => {
                     required
                   />
                 </div>
-                {loginError && (
-                  <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                    <p className="text-sm text-red-600 dark:text-red-400">{loginError}</p>
-                  </div>
-                )}
               </>
             ) : (
               <>
@@ -127,7 +138,7 @@ export const Auth: React.FC = () => {
               {isLogin ? "Don't have an account?" : "Already have an account?"}
               <span
                 className="text-blue-600 dark:text-blue-400 font-medium cursor-pointer ml-1 hover:underline"
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => { setIsLogin(!isLogin); setLoginError(''); }}
               >
                 {isLogin ? 'Register' : 'Login'}
               </span>

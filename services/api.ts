@@ -214,6 +214,35 @@ export const loginUser = async (email: string, password: string): Promise<User |
   return user;
 };
 
+// export const registerUser = async (userData: any): Promise<User> => {
+  // BASE_URL lấy từ biến môi trường (ví dụ: http://localhost:5000)
+  // const BASE_URL = import.meta.env.VITE_API_URL || ''; 
+
+//   // GỌI API THẬT
+//   const response = await fetch(`${BASE_URL}/api/auth/register`, {
+//     method: 'POST',
+//     headers: {
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify({
+//       firstName: userData.firstName,
+//       lastName: userData.lastName,
+//       email: userData.email,
+//       password: userData.password
+//     })
+//   });
+
+//   // Xử lý lỗi từ Backend trả về (VD: 409 Conflict - Email trùng)
+//   if (!response.ok) {
+//     // Cố gắng đọc tin nhắn lỗi từ server trả về (nếu có)
+//     const errorData = await response.json().catch(() => null);
+//     throw new Error(errorData?.message || 'Đăng ký thất bại');
+//   }
+
+//   // Trả về thông tin User đã tạo thành công
+//   return await response.json();
+// };
+
 export const fetchProjects = async (userId: string): Promise<Project[]> => {
   // TODO: API INTEGRATION [GET] /api/users/{userId}/projects
   await new Promise((resolve) => setTimeout(resolve, 500));
