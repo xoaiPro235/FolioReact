@@ -298,3 +298,35 @@ export class SignalRService {
 }
 
 export const signalRService = new SignalRService();
+
+export const fetchTaskActivities = async (taskId: string): Promise<ActivityLog[]> => {
+  // TODO: API INTEGRATION [GET] /api/tasks/{taskId}/activities
+  // Gọi về Backend để lấy logs của riêng task này
+  await new Promise(r => setTimeout(r, 300)); // Mock delay
+
+  // MOCK DATA: Trả về dữ liệu giả lập để test giao diện
+  // Trong thực tế bạn sẽ return await response.json();
+  return [
+    {
+      id: `log-${Date.now()}`,
+      userId: 'u1',
+      action: 'created task',
+      target: 'Design System',
+      createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+    },
+    {
+      id: `log-${Date.now() + 1}`,
+      userId: 'u2',
+      action: 'changed status to',
+      target: 'IN_PROGRESS',
+      createdAt: new Date(Date.now() - 86400000).toISOString()
+    },
+    {
+      id: `log-${Date.now() + 2}`,
+      userId: 'u1',
+      action: 'commented on',
+      target: 'this task',
+      createdAt: new Date().toISOString()
+    }
+  ];
+};
