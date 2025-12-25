@@ -35,6 +35,16 @@ export const MOCK_PROJECTS: Project[] = [
       { userId: 'u4', role: Role.MEMBER },
     ]
   },
+  {
+    id: 'p3',
+    name: 'Website Redesign',
+    description: 'Complete overhaul of the corporate website.',
+    ownerId: 'u2',
+    members: [
+      { userId: 'u2', role: Role.OWNER },
+      { userId: 'u5', role: Role.MEMBER },
+    ]
+  },
 ];
 
 // FLAT TASK STRUCTURE
