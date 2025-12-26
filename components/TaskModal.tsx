@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TaskStatus, Priority, ActivityLog, Role } from '../types';
 import {
   X, CheckSquare, MessageSquare, Send, Plus, Trash2,
@@ -42,9 +42,16 @@ export const TaskModal: React.FC = () => {
 
   const task = tasks.find(t => t.id === selectedTaskId);
 
-  const projectMembers = users.filter(u =>
-    currentProject?.members.some(m => m.userId === u.id)
-  );
+  // const projectMembers = users.filter(u =>
+  //   currentProject?.members.some(m => m.userId === u.id)
+  // );
+
+  const projectMembers = useMemo(() => {
+    return users.filter(u => {
+      const member = currentProject?.members.find(m => m.userId === u.id);
+      return member && member.role !== Role.VIEWER;
+    });
+  }, [users, currentProject?.members]);
 
   useEffect(() => {
     if (task) {

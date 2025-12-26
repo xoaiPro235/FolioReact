@@ -45,6 +45,7 @@ export interface ActivityLog {
   userId: string;
   action: string;
   target: string;
+  taskId?: string;
   createdAt: string;
 }
 

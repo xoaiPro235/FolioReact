@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
-import { Task, TaskStatus, Priority } from '../types';
+import { Task, TaskStatus, Priority, Role } from '../types';
 import { ChevronRight, ChevronDown, Plus, Trash2, Calendar } from 'lucide-react';
 import { UserSelect } from './UserSelect';
 import { StatusSelect, PrioritySelect, ConfirmDialog } from './Shared';
@@ -190,9 +190,16 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
     const { tasks, addTask, patchTask, deleteTask, currentProject, globalTaskSearch, users } = useStore();
 
     // Filter users to only show project members
-    const projectMembers = users.filter(u =>
-        currentProject?.members.some(m => m.userId === u.id)
-    );
+    // const projectMembers = users.filter(u =>
+    //     currentProject?.members.some(m => m.userId === u.id)
+    // );
+
+    const projectMembers = React.useMemo(() => {
+        return users.filter(u => {
+            const member = currentProject?.members.find(m => m.userId === u.id);
+            return member && member.role !== Role.VIEWER;
+        });
+    }, [users, currentProject?.members]);
 
     // Delete State
     const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
@@ -203,7 +210,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
         (t.title.toLowerCase().includes(globalTaskSearch.toLowerCase()) ||
             t.status.toLowerCase().includes(globalTaskSearch.toLowerCase()))
     );
-
+    // Cần sửa lại để gọi api
     const handleQuickAddSubtask = (parentTaskId: string, data: any) => {
         if (!currentProject) return;
         const task: Task = {

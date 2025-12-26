@@ -297,7 +297,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { currentUser } = get();
     if (currentUser) {
       const actionText = task.parentTaskId ? 'created subtask' : 'created task';
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: actionText, target: task.title, createdAt: new Date().toISOString() };
+      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: actionText, target: task.title, taskId: task.id, createdAt: new Date().toISOString() };
       set(state => ({ activities: [log, ...state.activities] }));
     }
   },
@@ -320,7 +320,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { currentUser } = get();
     if (currentUser) {
       // Standardization: Log Format
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: `updated status to ${newStatus}`, target: task.title, createdAt: new Date().toISOString() };
+      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: `updated status to ${newStatus}`, target: task.title, taskId: task.id, createdAt: new Date().toISOString() };
       set(state => ({ activities: [log, ...state.activities] }));
     }
   },
@@ -398,6 +398,7 @@ export const useStore = create<AppState>((set, get) => ({
         userId: currentUser.id,
         action: actionText,
         target: task.title,
+        taskId: task.id,
         createdAt: new Date().toISOString()
       };
 
@@ -442,6 +443,7 @@ export const useStore = create<AppState>((set, get) => ({
           userId: state.currentUser.id,
           action: 'deleted task',
           target: targetTask.title,
+          taskId: targetTask.id,
           createdAt: new Date().toISOString()
         };
         newActivities = [log, ...state.activities];
@@ -510,7 +512,7 @@ export const useStore = create<AppState>((set, get) => ({
     }));
 
     if (currentUser) {
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'created subtask', target: title, createdAt: new Date().toISOString() };
+      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'created subtask', target: title, taskId: newSubtask.id, createdAt: new Date().toISOString() };
       set(state => ({ activities: [log, ...state.activities] }));
     }
   },
@@ -537,7 +539,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Log Comment Activity
     const task = get().tasks.find(t => t.id === taskId);
     if (task) {
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'commented on', target: task.title, createdAt: new Date().toISOString() };
+      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'commented on', target: task.title, taskId: task.id, createdAt: new Date().toISOString() };
       set(state => ({ activities: [log, ...state.activities] }));
 
       // Send detailed notification about new comment

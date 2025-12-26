@@ -160,7 +160,7 @@ export const Overview: React.FC = () => {
           <div className="space-y-4">
             {activities.slice(0, 5).map(act => {
               const user = users.find(u => u.id === act.userId);
-              const task = tasks.find(t => t.title === act.target);
+              const task = tasks.find(t => t.id === act.taskId);
 
               // Logic Status
               const isStatusUpdate = act.action.includes('status to');
