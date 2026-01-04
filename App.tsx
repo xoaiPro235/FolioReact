@@ -34,6 +34,12 @@ export default function App() {
     // Ref để theo dõi ID thông báo mới nhất, tránh hiển thị lại khi re-render
     const lastNotificationIdRef = useRef<string | null>(null);
 
+    // Initialize auth on app load
+    useEffect(() => {
+        const { initializeAuth } = useStore.getState();
+        initializeAuth();
+    }, []);
+
     // Debounce Search
     const [searchTerm, setSearchTerm] = useState(globalTaskSearch);
 

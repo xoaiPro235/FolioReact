@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
 import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember } from './services/api';
+import { supabase } from './supabaseClient';
 
 interface AppState {
   // Global State
@@ -26,6 +27,7 @@ interface AppState {
   isLoading: boolean;
 
   // Actions
+  initializeAuth: () => Promise<void>;
   toggleTheme: () => void;
   login: (email: string, password: string) => Promise<void>;
   register: (data: any) => Promise<void>;
@@ -89,14 +91,54 @@ export const useStore = create<AppState>((set, get) => ({
   activities: [],
   isLoading: false,
 
-  toggleTheme: () => {
-    const newTheme = get().theme === 'light' ? 'dark' : 'light';
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  // Initialize auth state from Supabase session
+  initializeAuth: async () => {
+    try {
+      // Restore theme from localStorage
+      const savedTheme = localStorage.getItem('theme') as Theme;
+      if (savedTheme) {
+        set({ theme: savedTheme });
+        const htmlElement = document.documentElement;
+        if (savedTheme === 'dark') {
+          htmlElement.classList.add('dark');
+        } else {
+          htmlElement.classList.remove('dark');
+        }
+      }
+
+      const { data } = await supabase.auth.getSession();
+
+      if (data.session?.user) {
+        // Restore user from Supabase session
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.session.user.id)
+          .single();
+
+        const user: User = {
+          id: data.session.user.id,
+          email: data.session.user.email!,
+          name: profile?.name ?? data.session.user.user_metadata?.full_name ?? data.session.user.email!.split("@")[0],
+          avatar: profile?.avatar_url ?? data.session.user.user_metadata?.avatar_url ?? "",
+          isOnline: true,
+        };
+
+        set({ currentUser: user });
+
+        // Load workspace first
+        await get().goToWorkspace();
+
+        // Check if there was a previous project open
+        const previousProjectId = localStorage.getItem('lastProjectId');
+        if (previousProjectId) {
+          // Restore to previous project
+          await get().loadProjectData(previousProjectId);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to initialize auth:", error);
     }
-    set({ theme: newTheme });
   },
 
   login: async (email, password) => {
@@ -111,7 +153,6 @@ export const useStore = create<AppState>((set, get) => ({
       }
 
       // 2. Lưu currentUser vào Store ngay lập tức
-      // Hàm goToWorkspace bên dưới cần dùng get().currentUser.id để gọi API
       set({ currentUser: user });
 
       await get().goToWorkspace();
@@ -169,6 +210,25 @@ export const useStore = create<AppState>((set, get) => ({
     // TODO: API Call - [DELETE] /api/users/me
     set({ currentUser: null, currentView: 'AUTH' });
     alert("Account deleted.");
+  },
+
+  toggleTheme: () => {
+    set(state => {
+      const newTheme = state.theme === 'light' ? 'dark' : 'light';
+
+      // Update HTML class
+      const htmlElement = document.documentElement;
+      if (newTheme === 'dark') {
+        htmlElement.classList.add('dark');
+      } else {
+        htmlElement.classList.remove('dark');
+      }
+
+      // Persist to localStorage
+      localStorage.setItem('theme', newTheme);
+
+      return { theme: newTheme };
+    });
   },
 
   goToWorkspace: async () => {
@@ -347,6 +407,9 @@ export const useStore = create<AppState>((set, get) => ({
   loadProjectData: async (projectId: string) => {
     set({ isLoading: true, currentView: 'PROJECT' });
     try {
+      // Save projectId to localStorage for restore on reload
+      localStorage.setItem('lastProjectId', projectId);
+
       const project = get().projects.find(p => p.id === projectId) || null;
 
       const [tasks, memberUsers, activities] = await Promise.all([
@@ -434,7 +497,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateTaskStatus: async (taskId, newStatus) => {
     // Gọi trực tiếp patchTask, truyền status vào object updates
-    await get().patchTask(taskId, { status: newStatus });
+    get().patchTask(taskId, { status: newStatus });
   },
   patchTask: async (taskId, updates) => {
     // 1. VALIDATE TRƯỚC
