@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
-import { Task, TaskStatus, Priority } from '../types';
+import { Task, TaskStatus, Priority, Role } from '../types';
 import { ChevronRight, ChevronDown, Plus, Trash2, Calendar } from 'lucide-react';
 import { UserSelect } from './UserSelect';
 import { StatusSelect, PrioritySelect, ConfirmDialog } from './Shared';
@@ -118,17 +118,18 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
 
                                     {/* SỬA LỖI: Bọc UserSelect subtask */}
                                     <div className="w-32 flex-shrink-0">
-                                        <UserSelect users={projectMembers} selectedUserId={st.assigneeId} onChange={(id) => onAssigneeChange(st.id, id)} />
+                                        <UserSelect users={projectMembers} selectedUserId={st.assigneeId} onChange={(id) => onAssigneeChange(st.id, id)} readOnly={!canEdit} />
                                     </div>
 
-                                    <StatusSelect minimal value={st.status} onChange={(v) => onPatch(st.id, { status: v })} />
-                                    <PrioritySelect minimal value={st.priority} onChange={(v) => onPatch(st.id, { priority: v })} />
+                                    <StatusSelect minimal value={st.status} onChange={(v) => onPatch(st.id, { status: v })} readOnly={!canEdit} />
+                                    <PrioritySelect minimal value={st.priority} onChange={(v) => onPatch(st.id, { priority: v })} readOnly={!canEdit} />
 
                                     {/* Subtask Dates */}
                                     <input
                                         type="date"
                                         value={st.startDate || ''}
                                         onChange={(e) => onPatch(st.id, { startDate: e.target.value })}
+                                        disabled={!canEdit}
                                         className="bg-transparent text-xs text-slate-500 font-mono w-24 focus:bg-white dark:focus:bg-slate-800 rounded px-1 outline-none focus:ring-1 focus:ring-blue-500 dark:[color-scheme:dark]"
                                         placeholder="Start"
                                     />
@@ -136,6 +137,7 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
                                         type="date"
                                         value={st.dueDate || ''}
                                         onChange={(e) => onPatch(st.id, { dueDate: e.target.value })}
+                                        disabled={!canEdit}
                                         className="bg-transparent text-xs text-slate-500 font-mono w-24 focus:bg-white dark:focus:bg-slate-800 rounded px-1 outline-none focus:ring-1 focus:ring-blue-500 dark:[color-scheme:dark]"
                                         placeholder="Due"
                                     />
@@ -188,9 +190,16 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
     const { tasks, addTask, patchTask, deleteTask, currentProject, globalTaskSearch, users } = useStore();
 
     // Filter users to only show project members
-    const projectMembers = users.filter(u =>
-        currentProject?.members.some(m => m.userId === u.id)
-    );
+    // const projectMembers = users.filter(u =>
+    //     currentProject?.members.some(m => m.userId === u.id)
+    // );
+
+    const projectMembers = React.useMemo(() => {
+        return users.filter(u => {
+            const member = currentProject?.members.find(m => m.userId === u.id);
+            return member && member.role !== Role.VIEWER;
+        });
+    }, [users, currentProject?.members]);
 
     // Delete State
     const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
@@ -201,7 +210,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
         (t.title.toLowerCase().includes(globalTaskSearch.toLowerCase()) ||
             t.status.toLowerCase().includes(globalTaskSearch.toLowerCase()))
     );
-
+    // Cần sửa lại để gọi api
     const handleQuickAddSubtask = (parentTaskId: string, data: any) => {
         if (!currentProject) return;
         const task: Task = {

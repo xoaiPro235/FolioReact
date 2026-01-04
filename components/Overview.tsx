@@ -134,12 +134,12 @@ export const Overview: React.FC = () => {
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Workload by Assignee</h3>
 
           {/* Biểu đồ cột - Tắt focus outline */}
-          <div style={{ width: '100%', height: '250px' }} className="[&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <BarChart data={workloadData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+          <div style={{ width: '100%', height: '300px', minWidth: 0, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={workloadData} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
                 <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 12, fill: '#64748b' }} />
                 <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none' }} />
                 <Bar dataKey="tasks" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
@@ -160,7 +160,7 @@ export const Overview: React.FC = () => {
           <div className="space-y-4">
             {activities.slice(0, 5).map(act => {
               const user = users.find(u => u.id === act.userId);
-              const task = tasks.find(t => t.title === act.target);
+              const task = tasks.find(t => t.id === act.taskId);
 
               // Logic Status
               const isStatusUpdate = act.action.includes('status to');

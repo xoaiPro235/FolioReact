@@ -79,7 +79,6 @@ export const TeamView: React.FC = () => {
                                     <div>
                                         <p className="font-medium text-slate-900 dark:text-slate-100">{user.name}</p>
                                         <p className="text-xs text-slate-500">{user.email}</p>
-                                        <p className="text-xs text-slate-400 mt-0.5">{user.title || 'Member'}</p>
                                     </div>
                                 </div>
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TaskStatus, Priority, ActivityLog } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { TaskStatus, Priority, ActivityLog, Role } from '../types';
 import {
   X, CheckSquare, MessageSquare, Send, Plus, Trash2,
   CornerUpLeft, Calendar, History, Clock
@@ -12,12 +12,13 @@ import {
   StatusBadge, PriorityBadge // Import Badge
 } from './Shared';
 import { fetchTaskActivities } from '../services/api';
+import { read } from 'fs';
 
 export const TaskModal: React.FC = () => {
   const {
     users, currentUser, currentProject, deleteTask, addComment,
     tasks, patchTask, selectedTaskId, setSelectedTask,
-    addAttachment, removeAttachment
+    addAttachment, removeAttachment, getUserRole
   } = useStore();
 
   const [commentText, setCommentText] = useState('');
@@ -41,9 +42,16 @@ export const TaskModal: React.FC = () => {
 
   const task = tasks.find(t => t.id === selectedTaskId);
 
-  const projectMembers = users.filter(u =>
-    currentProject?.members.some(m => m.userId === u.id)
-  );
+  // const projectMembers = users.filter(u =>
+  //   currentProject?.members.some(m => m.userId === u.id)
+  // );
+
+  const projectMembers = useMemo(() => {
+    return users.filter(u => {
+      const member = currentProject?.members.find(m => m.userId === u.id);
+      return member && member.role !== Role.VIEWER;
+    });
+  }, [users, currentProject?.members]);
 
   useEffect(() => {
     if (task) {
@@ -68,7 +76,8 @@ export const TaskModal: React.FC = () => {
   const isSubtask = !!task.parentTaskId;
   const parentTask = isSubtask ? tasks.find(t => t.id === task.parentTaskId) : null;
   const subtasks = tasks.filter(t => t.parentTaskId === task.id);
-  const readOnly = false;
+  const role = getUserRole();
+  const readOnly = role === Role.VIEWER || role === null;
 
   const handleStatusChange = (newStatus: string) => {
     patchTask(task.id, { status: newStatus as TaskStatus });
@@ -163,9 +172,11 @@ export const TaskModal: React.FC = () => {
                 readOnly={readOnly}
                 className="w-full sm:w-64 h-10"
               />
-              <button onClick={handleDeleteTaskClick} className="p-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full text-slate-400 hover:text-red-600 transition-colors" title="Delete Task">
-                <Trash2 className="w-5 h-5" />
-              </button>
+              {!readOnly && (
+                <button onClick={handleDeleteTaskClick} className="p-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full text-slate-400 hover:text-red-600 transition-colors" title="Delete Task">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
               <button onClick={() => setSelectedTask(null)} className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -177,6 +188,7 @@ export const TaskModal: React.FC = () => {
           {/* Main Content */}
           <div className="flex-1 p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
             <input
+              readOnly={readOnly}
               value={localTitle}
               onChange={(e) => setLocalTitle(e.target.value)}
               onBlur={handleBlurTitle}
@@ -187,6 +199,7 @@ export const TaskModal: React.FC = () => {
             <div className="mb-8 group">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Description</h3>
               <textarea
+                readOnly={readOnly}
                 value={localDesc}
                 onChange={(e) => setLocalDesc(e.target.value)}
                 onBlur={handleBlurDesc}
@@ -196,7 +209,7 @@ export const TaskModal: React.FC = () => {
             </div>
 
             <div className="mb-8">
-              <AttachmentList files={task.files} onUpload={handleUpload} onDelete={handleRemoveAttachmentClick} />
+              <AttachmentList files={task.files} onUpload={readOnly ? undefined : handleUpload} onDelete={readOnly ? undefined : handleRemoveAttachmentClick} />
             </div>
 
             {/* Subtasks */}
@@ -222,7 +235,7 @@ export const TaskModal: React.FC = () => {
                       className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
                     >
                       <div className="flex-shrink-0">
-                        <StatusSelect minimal value={st.status} onChange={(val) => patchTask(st.id, { status: val })} />
+                        <StatusSelect minimal value={st.status} onChange={(val) => patchTask(st.id, { status: val })} readOnly={readOnly} />
                       </div>
                       <span
                         className={`flex-1 text-sm font-medium cursor-pointer hover:text-blue-600 ${st.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}
@@ -231,19 +244,22 @@ export const TaskModal: React.FC = () => {
                         {st.title}
                       </span>
                       <div className="flex items-center gap-3">
-                        <PrioritySelect minimal value={st.priority} onChange={(val) => patchTask(st.id, { priority: val })} />
+                        <PrioritySelect minimal value={st.priority} onChange={(val) => patchTask(st.id, { priority: val })} readOnly={readOnly} />
                         <UserSelect
                           users={projectMembers}
                           selectedUserId={st.assigneeId}
                           onChange={(id) => patchTask(st.id, { assigneeId: id })}
+                          readOnly={readOnly}
                           className="w-32"
                         />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteSubtaskClick(st.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 rounded transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteSubtaskClick(st.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 rounded transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -269,8 +285,8 @@ export const TaskModal: React.FC = () => {
                 <button
                   onClick={() => setActiveTab('comments')}
                   className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'comments'
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
                     }`}
                 >
                   <MessageSquare className="w-4 h-4" /> Comments ({task.comments.length})
@@ -278,8 +294,8 @@ export const TaskModal: React.FC = () => {
                 <button
                   onClick={() => setActiveTab('activity')}
                   className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'activity'
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
                     }`}
                 >
                   <History className="w-4 h-4" /> Activity Log
@@ -397,7 +413,7 @@ export const TaskModal: React.FC = () => {
                     <input
                       disabled={readOnly}
                       type="date"
-                      value={task.startDate || ''}
+                      value={ task.startDate?.split('T')[0] ?? '' }
                       onChange={(e) => handleDateChange('startDate', e.target.value)}
                       className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 shadow-sm dark:[color-scheme:dark]"
                     />
@@ -407,7 +423,7 @@ export const TaskModal: React.FC = () => {
                     <input
                       disabled={readOnly}
                       type="date"
-                      value={task.dueDate || ''}
+                      value={task.dueDate?.split('T')[0] ?? ''}
                       onChange={(e) => handleDateChange('dueDate', e.target.value)}
                       className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 shadow-sm dark:[color-scheme:dark]"
                     />

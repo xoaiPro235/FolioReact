@@ -20,10 +20,14 @@ export const Workspace: React.FC = () => {
   }, [currentUser]);
 
   // Debounced Search logic could go here, but kept simple for now
-  const filteredProjects = projects.filter(p => 
-      p.name.toLowerCase().includes(workspaceSearchQuery.toLowerCase()) || 
-      p.description.toLowerCase().includes(workspaceSearchQuery.toLowerCase())
-  );
+  const filteredProjects = projects.filter(p => {
+    // Luôn đảm bảo name và description là chuỗi trước khi xử lý
+    const safeName = (p.name || '').toLowerCase();
+    const safeDesc = (p.description || '').toLowerCase();
+    const query = workspaceSearchQuery.toLowerCase();
+
+    return safeName.includes(query) || safeDesc.includes(query);
+  });
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();

@@ -131,8 +131,8 @@ export const ProjectView: React.FC = () => {
                   <div className="space-y-6">
                     {activities.map(act => {
                       const user = users.find(u => u.id === act.userId);
-                      const task = useStore.getState().tasks.find(t => t.title === act.target);
-
+                      // const task = useStore.getState().tasks.find(t => t.title === act.target);
+                      const task = useStore.getState().tasks.find(t => t.id === act.taskId);
                       // Logic Status
                       const isStatusUpdate = act.action.includes('status to');
                       const statusFromAction = isStatusUpdate ? (act.action.split('to ')[1] || '').trim() : '';

@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
-import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, MOCK_USERS, uploadFile } from './services/api';
+import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember } from './services/api';
 
 interface AppState {
   // Global State
@@ -55,7 +55,7 @@ interface AppState {
   removeAttachment: (taskId: string, fileId: string) => void;
 
   // Subtask Legacy Support (Prefer addTask)
-  createSubtask: (parentTaskId: string, title: string) => void;
+  //: (parentTaskId: string, title: string) => void;
 
   addComment: (taskId: string, content: string) => void;
 
@@ -101,93 +101,57 @@ export const useStore = create<AppState>((set, get) => ({
 
   login: async (email, password) => {
     set({ isLoading: true });
-    // TODO: API Call - [POST] /api/auth/login
+
     try {
-      // Hàm loginUser trong api.ts đã được thiết kế để throw Error nếu sai pass
+      // 1. Gọi API đăng nhập để lấy thông tin User
       const user = await loginUser(email, password);
 
       if (!user) {
         throw new Error('Login failed');
       }
 
-      // ... logic load data giữ nguyên ...
-      const [projects, users] = await Promise.all([
-        fetchProjects(user.id),
-        fetchUsers()
-      ]);
+      // 2. Lưu currentUser vào Store ngay lập tức
+      // Hàm goToWorkspace bên dưới cần dùng get().currentUser.id để gọi API
+      set({ currentUser: user });
 
-      set({ currentUser: user, projects, users, currentView: 'WORKSPACE', isLoading: false });
+      await get().goToWorkspace();
+
     } catch (e) {
+      // Nếu có lỗi thì tắt loading và ném lỗi ra
       set({ isLoading: false });
-      // Ném lỗi ra để component Auth.tsx bắt được
       throw new Error("Incorrect email or password.");
     }
   },
 
   register: async (data) => {
     set({ isLoading: true });
-    
-    // TODO: API Call - [POST] /api/auth/register
-    //const newUser = await registerUser(data);
-    // Giả lập độ trễ mạng
-    await new Promise(r => setTimeout(r, 800));
 
     try {
-      // 1. KIỂM TRA TRÙNG EMAIL (Logic Mock)
-      // Trong thực tế, Backend API sẽ trả về lỗi 409 Conflict
-      const emailExists = MOCK_USERS.some(u => u.email.toLowerCase() === data.email.toLowerCase());
+      // 1. Gọi API đăng ký
+      await registerUser(data);
 
-      if (emailExists) {
-        throw new Error("This email address is already in use.");
+      // 2. Thông báo thành công
+      get().addNotification(`Account created successfully!`, 'SUCCESS');
+
+      // 3. Tự động đăng nhập luôn
+      // Không set isLoading: false ở đây. 
+      // Hãy để hàm login tự lo liệu việc đó. Nếu set false ở đây màn hình sẽ bị nháy.
+
+      try {
+        await get().login(data.email, data.password);
+      } catch (loginError) {
+        // Trường hợp hiếm: Đăng ký xong nhưng login thất bại 
+        // (Ví dụ: Supabase bắt confirm email)
+        console.warn("Auto-login failed:", loginError);
+        set({ isLoading: false, currentView: 'AUTH' }); // Quay về trang login để họ tự nhập lại
+        get().addNotification("Please check email or login manually.", "INFO");
       }
 
-      // 2. Nếu không trùng thì tạo user mới
-      const newUser: User = {
-        id: `u${Date.now()}`,
-        name: `${data.firstName} ${data.lastName}`,
-        email: data.email,
-        avatar: `https://ui-avatars.com/api/?name=${data.firstName}+${data.lastName}&background=random`,
-        title: 'New Member',
-        isOnline: true
-      };
-
-      // Auto login luôn sau khi đăng ký
-      set({ currentUser: newUser, projects: [], users: [...MOCK_USERS, newUser], currentView: 'WORKSPACE', isLoading: false });
-      get().addNotification(`Welcome ${newUser.name}! Account created successfully.`, 'SUCCESS');
-
-    } catch (error) {
-      set({ isLoading: false });
-      throw error; // Ném lỗi ra để Auth.tsx hiển thị
+    } catch (error: any) {
+      set({ isLoading: false }); // Chỉ tắt loading khi có lỗi đăng ký thực sự
+      throw error; // Ném ra để Auth.tsx hiển thị lỗi đỏ
     }
   },
-  // register: async (data) => {
-  //   set({ isLoading: true });
-
-  //   try {
-  //     // --- GỌI API THẬT ---
-  //     // Không cần setTimeout giả lập nữa vì gọi mạng đã tốn thời gian rồi
-  //     const newUser = await registerUser(data);
-
-  //     // --- NẾU THÀNH CÔNG (Backend trả về 200 OK) ---
-  //     // Backend đã tạo user xong, giờ mình cập nhật vào Store để đăng nhập luôn
-  //     set({
-  //       currentUser: newUser,
-  //       projects: [],
-  //       users: [], // Lúc này chưa có users khác, sẽ load sau
-  //       currentView: 'WORKSPACE',
-  //       isLoading: false
-  //     });
-
-  //     get().addNotification(`Welcome ${newUser.name}! Account created successfully.`, 'SUCCESS');
-
-  //   } catch (error: any) {
-  //     set({ isLoading: false });
-
-  //     // Ném lỗi ra để component Auth.tsx hiển thị thông báo đỏ
-  //     // Lỗi này chính là cái "throw new Error" từ api.ts
-  //     throw error;
-  //   }
-  // },
 
   logout: () => {
     set({ currentUser: null, currentView: 'AUTH', currentProject: null });
@@ -209,13 +173,63 @@ export const useStore = create<AppState>((set, get) => ({
 
   goToWorkspace: async () => {
     const { currentUser } = get();
+
     if (currentUser) {
-      // Refresh workspace data
-      const [projects, users] = await Promise.all([
-        fetchProjects(currentUser.id),
-        fetchUsers()
-      ]);
-      set({ currentView: 'WORKSPACE', currentProject: null, selectedTaskId: null, projects, users });
+      set({ isLoading: true }); // Bật loading cho chuyên nghiệp
+
+      try {
+        // 1. Chỉ gọi duy nhất API fetchProjects
+        const apiResponse = await fetchProjects(currentUser.id);
+
+        // 2. XỬ LÝ DỮ LIỆU (Mapping)
+
+        // A. Tạo danh sách Projects chuẩn cho Store
+        // Cấu trúc Store cần: Project { id, ..., members: [{ userId, role }] }
+        const normalizedProjects: Project[] = apiResponse.map((item: any) => ({
+          ...item.project,
+          ownerId: item.project.ownerId,
+          members: item.members.map((m: any) => ({
+            userId: m.id,
+            role: m.role
+          }))
+        }));
+
+        // B. Trích xuất danh sách Users từ mảng members
+        // Gom tất cả member từ tất cả dự án lại thành 1 danh sách user duy nhất
+        const allMembers = apiResponse.flatMap((item: any) => item.members);
+
+        // Lọc trùng (Deduplicate) - Vì 1 người có thể ở trong nhiều dự án
+        const uniqueUsersMap = new Map();
+        allMembers.forEach((m: any) => {
+          if (!uniqueUsersMap.has(m.id)) {
+            uniqueUsersMap.set(m.id, {
+              id: m.id,
+              name: m.name,
+              email: m.email,
+              avatar: m.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=random`,
+              bio: m.bio || '',
+              isOnline: m.isOnline
+            });
+          }
+        });
+
+        // Chuyển Map thành Array để lưu vào Store
+        const extractedUsers = Array.from(uniqueUsersMap.values());
+
+        // 3. Cập nhật State
+        set({
+          currentView: 'WORKSPACE',
+          currentProject: null,
+          selectedTaskId: null,
+          projects: normalizedProjects,
+          users: extractedUsers,
+          isLoading: false
+        });
+
+      } catch (error) {
+        console.error("Lỗi tải workspace:", error);
+        set({ isLoading: false });
+      }
     } else {
       set({ currentView: 'WORKSPACE', currentProject: null, selectedTaskId: null });
     }
@@ -225,241 +239,313 @@ export const useStore = create<AppState>((set, get) => ({
     set({ currentView: 'PROFILE', selectedTaskId: null });
   },
 
-  loadWorkspaceData: async (userId) => {
-    // Helper to just load users/projects if needed
-    const [projects, users] = await Promise.all([
-      fetchProjects(userId),
-      fetchUsers()
-    ]);
-    set({ projects, users });
+  loadWorkspaceData: async (userId: string) => {
+    set({ isLoading: true });
+
+    try {
+      // 1. Chỉ gọi duy nhất API fetchProjects (Giống hệt goToWorkspace)
+      const apiResponse = await fetchProjects(userId);
+
+      // 2. XỬ LÝ DỮ LIỆU (Mapping & Extracting)
+
+      // A. Chuẩn hóa danh sách Projects
+      const normalizedProjects: Project[] = apiResponse.map((item: any) => ({
+        ...item.project,
+        members: item.members.map((m: any) => ({
+          userId: m.id,
+          role: m.role
+        }))
+      }));
+
+      // B. Trích xuất danh sách Users từ mảng members (Logic "Tái chế")
+      const allMembers = apiResponse.flatMap((item: any) => item.members);
+
+      const uniqueUsersMap = new Map();
+      allMembers.forEach((m: any) => {
+        if (!uniqueUsersMap.has(m.id)) {
+          uniqueUsersMap.set(m.id, {
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            avatar: m.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=random`,
+            isOnline: m.isOnline || false
+          });
+        }
+      });
+
+      const extractedUsers = Array.from(uniqueUsersMap.values());
+
+      // 3. Cập nhật Store
+      set({
+        projects: normalizedProjects,
+        users: extractedUsers, // List user này được trích xuất từ chính project, không cần fetch riêng
+        isLoading: false
+      });
+
+    } catch (error) {
+      console.error("Failed to load workspace data", error);
+      set({ isLoading: false });
+    }
   },
 
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
   setGlobalTaskSearch: (query) => set({ globalTaskSearch: query }),
   setWorkspaceSearch: (query) => set({ workspaceSearchQuery: query }),
 
-  createProject: (name, desc) => {
-    const { currentUser, projects } = get();
-    if (!currentUser) return;
+  createProject: async (name, desc) => {
+    set({ isLoading: true });
+    try {
+      const newProject = await createProject({ name: name, description: desc });
+      const currentUser = get().currentUser;
 
-    // TODO: API Call - [POST] /api/projects
-    const newProject: Project = {
-      id: `p${Date.now()}`,
-      name,
-      description: desc,
-      ownerId: currentUser.id,
-      members: [{ userId: currentUser.id, role: Role.OWNER }]
-    };
-    set({ projects: [...projects, newProject] });
+      if (!currentUser) throw new Error("User not found");
+
+      const newProjectWithOwner: Project = {
+        ...newProject,
+        members: [{ userId: currentUser.id, role: Role.OWNER }]
+      };
+
+      set((state) => ({
+        projects: [...state.projects, newProjectWithOwner],
+        isLoading: false
+      }));
+
+      get().addNotification("Project created successfully", "SUCCESS");
+
+    } catch (error) {
+      console.error("Failed to create project", error);
+      set({ isLoading: false });
+      get().addNotification("Failed to create project", "ERROR");
+    }
   },
 
-  deleteProject: (projectId) => {
-    // TODO: API Call - [DELETE] /api/projects/{id}
-    set((state) => ({
-      projects: state.projects.filter(p => p.id !== projectId),
-      currentView: 'WORKSPACE',
-      currentProject: null
-    }));
-    get().addNotification("Project deleted", "INFO");
+  deleteProject: async (projectId) => {
+    set({ isLoading: true });
+
+    try {
+      // 1. Gọi API (Dùng tên hàm API đã import, không dùng deleteProject trùng tên)
+      await deleteProjectApi(projectId);
+
+      // 2. Cập nhật State khi thành công
+      set((state) => ({
+        projects: state.projects.filter(p => p.id !== projectId),
+        currentView: 'WORKSPACE',
+        currentProject: null,
+        isLoading: false
+      }));
+
+      get().addNotification("Project deleted successfully", "INFO");
+
+    } catch (error) {
+      console.error("Failed to delete project", error);
+      set({ isLoading: false }); // Tắt loading khi lỗi
+      get().addNotification("Failed to delete project", "ERROR");
+    }
   },
+
 
   loadProjectData: async (projectId: string) => {
     set({ isLoading: true, currentView: 'PROJECT' });
     try {
       const project = get().projects.find(p => p.id === projectId) || null;
-      const [tasks, users, activities] = await Promise.all([
+
+      const [tasks, memberUsers, activities] = await Promise.all([
         fetchTasks(projectId),
-        fetchUsers(),
+        fetchProjectMembers(projectId),  // User[] + role (with avatarUrl)
         fetchActivities(projectId)
       ]);
-      set({ currentProject: project, tasks, users, activities, isLoading: false });
+
+      // Map Member[] → ProjectMember[]
+      const projectMembers: ProjectMember[] = memberUsers.map((user: any) => ({
+        userId: user.id,
+        role: user.role
+      }));
+
+      // Convert avatarUrl → avatar for User type consistency
+      const users = memberUsers.map((user: any) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        // Use avatarUrl if exists, otherwise generate default from name
+        avatar: user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`,
+        bio: user.bio,
+        isOnline: user.isOnline ?? false
+      }));
+
+      const updatedProject = project
+        ? { ...project, members: projectMembers }
+        : {
+          id: projectId,
+          name: 'Unknown Project',
+          description: '',
+          ownerId: '',
+          members: projectMembers
+        };
+
+      set({
+        currentProject: updatedProject,
+        tasks,
+        users,  // Mapped users with avatar field
+        activities,
+        isLoading: false
+      });
     } catch (error) {
       console.error("Failed to load project data", error);
       set({ isLoading: false });
     }
   },
 
-  addTask: (task) => {
-    // TODO: API Call - [POST] /api/tasks
-    // TODO: SignalR - hubConnection.invoke("CreateTask", task);
 
-    // Strict Logic: Ensure created date and default null assignee
-    const safeTask = {
-      ...task,
-      assigneeId: task.assigneeId || undefined, // Unassigned if empty
-      createdAt: new Date().toISOString(),
-      files: []
-    };
+  addTask: async (task) => {
+    set({ isLoading: true });
+    try {
+      const responseTask = await createTask(task);
 
-    set((state) => ({ tasks: [...state.tasks, safeTask] }));
+      // Activity Log logic
+      const { currentUser } = get();
+      let newActivities = get().activities;
 
-    // Activity Log
-    const { currentUser } = get();
-    if (currentUser) {
-      const actionText = task.parentTaskId ? 'created subtask' : 'created task';
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: actionText, target: task.title, createdAt: new Date().toISOString() };
-      set(state => ({ activities: [log, ...state.activities] }));
+      if (currentUser) {
+        const actionText = task.parentTaskId ? 'created subtask' : 'created task';
+        const log: ActivityLog = {
+          id: `act-${Date.now()}`,
+          userId: currentUser.id,
+          action: actionText,
+          target: task.title,
+          taskId: responseTask.id, // Dùng ID thật từ server trả về
+          createdAt: new Date().toISOString()
+        };
+        newActivities = [log, ...newActivities];
+      }
+
+      set((state) => ({
+        tasks: [...state.tasks, responseTask],
+        activities: newActivities,
+        isLoading: false
+      }));
+
+      get().addNotification("Task created successfully", "SUCCESS");
+
+    } catch (error) {
+      set({ isLoading: false });
+      get().addNotification("Failed to create project", "ERROR");
     }
   },
 
-  updateTaskStatus: (taskId, newStatus) => {
-    // TODO: API Call - [PATCH] /api/tasks/{id}/status
-    // TODO: SignalR - hubConnection.invoke("UpdateTaskStatus", taskId, newStatus);
-
-    // Prevent spam: Check if status actually changed
-    const task = get().tasks.find(t => t.id === taskId);
-    if (!task || task.status === newStatus) return;
-
-    set((state) => ({
-      tasks: state.tasks.map((t) =>
-        t.id === taskId ? { ...t, status: newStatus } : t
-      ),
-    }));
-
-    // Add Activity Log
-    const { currentUser } = get();
-    if (currentUser) {
-      // Standardization: Log Format
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: `updated status to ${newStatus}`, target: task.title, createdAt: new Date().toISOString() };
-      set(state => ({ activities: [log, ...state.activities] }));
-    }
+  updateTaskStatus: async (taskId, newStatus) => {
+    // Gọi trực tiếp patchTask, truyền status vào object updates
+    await get().patchTask(taskId, { status: newStatus });
   },
-
-  patchTask: (taskId, updates) => {
-    // TODO: API Call - [PATCH] /api/tasks/{id}
-    // TODO: SignalR - hubConnection.invoke("UpdateTask", taskId, updates);
-
-    const { currentUser, users, tasks } = get(); // Lấy thêm users để tra cứu tên
+  patchTask: async (taskId, updates) => {
+    // 1. VALIDATE TRƯỚC
+    const { currentUser, users, tasks } = get();
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Check if anything actually changed (Spam Prevention)
+    // Kiểm tra xem có trường nào thực sự thay đổi không
     const hasChanges = Object.keys(updates).some(key => {
       // @ts-ignore
       return task[key] !== updates[key];
     });
 
-    if (!hasChanges) return;
+    if (!hasChanges) return; // Không thay đổi -> Không gọi API
 
-    // Cập nhật State
-    set((state) => ({
-      tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
-    }));
+    // 2. GỌI API
+    try {
+      await updateTask(taskId, updates);
 
-    // GHI LOG CHI TIẾT
-    if (currentUser && Object.keys(updates).length > 0) {
-      const key = Object.keys(updates)[0];
-      let actionText = `updated ${key} on`;
+      // 3. CẬP NHẬT STATE
+      set((state) => ({
+        tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
+      }));
 
-      switch (key) {
-        case 'status':
-          // Ví dụ: updated status to IN_PROGRESS
-          actionText = `updated status to ${updates.status}`;
-          break;
+      // 4. LOGGING (Logic của bạn viết đoạn này rất tốt, giữ nguyên)
+      if (currentUser) {
+        const key = Object.keys(updates)[0];
+        let actionText = `updated ${key} on`;
 
-        case 'priority':
-          // Ví dụ: updated priority to HIGH
-          actionText = `updated priority to ${updates.priority}`;
-          break;
+        switch (key) {
+          case 'status': actionText = `updated status to ${updates.status}`; break;
+          case 'priority': actionText = `updated priority to ${updates.priority}`; break;
+          case 'assigneeId':
+            const newAssignee = users.find(u => u.id === updates.assigneeId);
+            actionText = newAssignee ? `assigned to ${newAssignee.name}` : `removed assignee from`;
+            break;
+          case 'startDate': actionText = `set start date to ${updates.startDate}`; break;
+          case 'dueDate': actionText = `set due date to ${updates.dueDate}`; break;
+          case 'title': actionText = `renamed task`; break;
+          case 'description': actionText = `updated description of`; break;
+        }
 
-        case 'assigneeId':
-          const newAssignee = users.find(u => u.id === updates.assigneeId);
-          // Ví dụ: assigned to Alice Johnson
-          actionText = newAssignee
-            ? `assigned to ${newAssignee.name}`
-            : `removed assignee from`;
-          break;
-
-        case 'startDate':
-          // Ví dụ: set start date to 2025-12-20
-          actionText = `set start date to ${updates.startDate}`;
-          break;
-
-        case 'dueDate':
-          // Ví dụ: set due date to 2025-12-25
-          actionText = `set due date to ${updates.dueDate}`;
-          break;
-
-        case 'title':
-          // Ví dụ: renamed task
-          actionText = `renamed task`;
-          break;
-
-        case 'description':
-          actionText = `updated description of`;
-          break;
-
-        default:
-          actionText = `updated ${key} on`;
+        const log: ActivityLog = {
+          id: `act-${Date.now()}`,
+          userId: currentUser.id,
+          action: actionText,
+          target: task.title,
+          taskId: task.id,
+          createdAt: new Date().toISOString()
+        };
+        set(state => ({ activities: [log, ...state.activities] }));
       }
-
-      const log: ActivityLog = {
-        id: `act-${Date.now()}`,
-        userId: currentUser.id,
-        action: actionText,
-        target: task.title,
-        createdAt: new Date().toISOString()
-      };
-
-      set(state => ({ activities: [log, ...state.activities] }));
+    } catch (error) {
+      get().addNotification("Cập nhật task thất bại", "ERROR");
     }
   },
 
-  deleteTask: (taskId) => {
-    // 1. Immediate State Update to prevent "Ghost Items"
-    // TODO: API Call - [DELETE] /api/tasks/{id}
-    // TODO: SignalR - hubConnection.invoke("DeleteTask", taskId);
+  deleteTask: async (taskId) => {
+    // 1. GỌI API
+    try {
+      await deleteTask(taskId);
 
-    set((state) => {
-      const targetTask = state.tasks.find(t => t.id === taskId);
-      if (!targetTask) return {}; // Task already gone or invalid
+      // 2. CẬP NHẬT STATE (Chỉ chạy khi API thành công)
+      set((state) => {
+        const targetTask = state.tasks.find(t => t.id === taskId);
+        if (!targetTask) return {};
 
-      // Filter out the task itself AND any subtasks (children)
-      // This handles "Deleting a Parent" -> Removes Parent + Children
-      // This handles "Deleting a Subtask" -> Removes Subtask only
-      const updatedTasks = state.tasks.filter((t) => t.id !== taskId && t.parentTaskId !== taskId);
+        // Logic xóa cha và con: OK
+        const updatedTasks = state.tasks.filter((t) => t.id !== taskId && t.parentTaskId !== taskId);
 
-      // Modal Handling: Close modal if we deleted the currently open task
-      // OR if we deleted the parent of the currently open task
-      let nextSelectedId = state.selectedTaskId;
+        // Logic đóng Modal thông minh: OK
+        let nextSelectedId = state.selectedTaskId;
+        const currentlyOpenTask = state.tasks.find(t => t.id === state.selectedTaskId);
 
-      const currentlyOpenTask = state.tasks.find(t => t.id === state.selectedTaskId);
+        if (state.selectedTaskId === taskId) {
+          nextSelectedId = null;
+        } else if (currentlyOpenTask && currentlyOpenTask.parentTaskId === taskId) {
+          nextSelectedId = null;
+        }
 
-      // Case 1: The open task IS the deleted task
-      if (state.selectedTaskId === taskId) {
-        nextSelectedId = null;
-      }
-      // Case 2: The open task is a child of the deleted task
-      else if (currentlyOpenTask && currentlyOpenTask.parentTaskId === taskId) {
-        nextSelectedId = null;
-      }
+        // Logic Log
+        let newActivities = state.activities;
+        if (state.currentUser) {
+          const log: ActivityLog = {
+            id: `act-${Date.now()}`,
+            userId: state.currentUser.id,
+            action: 'deleted task',
+            target: targetTask.title,
+            taskId: targetTask.id,
+            createdAt: new Date().toISOString()
+          };
+          newActivities = [log, ...state.activities];
+        }
 
-      // Logging
-      let newActivities = state.activities;
-      if (state.currentUser) {
-        const log: ActivityLog = {
-          id: `act-${Date.now()}`,
-          userId: state.currentUser.id,
-          action: 'deleted task',
-          target: targetTask.title,
-          createdAt: new Date().toISOString()
+        return {
+          tasks: updatedTasks,
+          selectedTaskId: nextSelectedId,
+          activities: newActivities
         };
-        newActivities = [log, ...state.activities];
-      }
+      });
 
-      return {
-        tasks: updatedTasks,
-        selectedTaskId: nextSelectedId,
-        activities: newActivities
-      };
-    });
+      get().addNotification("Xóa task thành công", "INFO");
 
-    get().addNotification("Task deleted successfully", "INFO");
+    } catch (error) {
+      get().addNotification("Xóa task thất bại", "ERROR");
+    }
   },
 
   addAttachment: async (taskId, file) => {
     // TODO: API Call - [POST] /api/tasks/{id}/attachments
-    const uploadedFile = await uploadFile(file);
+    const uploadedFile = await uploadFile(taskId, file);
 
     set(state => ({
       tasks: state.tasks.map(t =>
@@ -483,37 +569,7 @@ export const useStore = create<AppState>((set, get) => ({
     get().addNotification("File removed", "INFO");
   },
 
-  createSubtask: (parentTaskId, title) => {
-    // Simplified inline creation (Legacy support, preferred method is addTask from modal)
-    const { currentProject, currentUser } = get();
-    if (!currentProject) return;
 
-    // TODO: API Call - [POST] /api/tasks
-    const newSubtask: Task = {
-      id: `t${Date.now()}`,
-      projectId: currentProject.id,
-      parentTaskId: parentTaskId,
-      title: title,
-      description: '',
-      status: TaskStatus.TODO,
-      priority: Priority.MEDIUM,
-      tags: [],
-      dueDate: new Date().toISOString().split('T')[0],
-      comments: [],
-      createdAt: new Date().toISOString(),
-      assigneeId: undefined,
-      files: []
-    };
-
-    set((state) => ({
-      tasks: [...state.tasks, newSubtask]
-    }));
-
-    if (currentUser) {
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'created subtask', target: title, createdAt: new Date().toISOString() };
-      set(state => ({ activities: [log, ...state.activities] }));
-    }
-  },
 
   addComment: (taskId, content) => {
     const { currentUser } = get();
@@ -537,7 +593,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Log Comment Activity
     const task = get().tasks.find(t => t.id === taskId);
     if (task) {
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'commented on', target: task.title, createdAt: new Date().toISOString() };
+      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'commented on', target: task.title, taskId: task.id, createdAt: new Date().toISOString() };
       set(state => ({ activities: [log, ...state.activities] }));
 
       // Send detailed notification about new comment
@@ -602,84 +658,96 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  inviteUserToProject: (user, role) => {
-    // TODO: API Call - [POST] /api/projects/{id}/members
+  inviteUserToProject: async (user, role) => {
     const { currentProject } = get();
+    if (!currentProject) return;
 
-    set((state) => {
-      if (!state.currentProject) return {};
-      if (state.currentProject.members.find(m => m.userId === user.id)) return {};
+    try {
+      const response = await addProjectMember(currentProject.id, user.id, role);
 
-      const newMember = { userId: user.id, role };
-      return {
-        currentProject: { ...state.currentProject, members: [...state.currentProject.members, newMember] }
+      if (!response) {
+        throw new Error("API response is undefined");
+      }
+
+      const newMember: ProjectMember = {
+        userId: response.userId,
+        role: response.role
       };
-    });
 
-    get().addDetailedNotification({
-      message: `Invited ${user.name} as ${role} to "${currentProject?.name}"`,
-      type: 'SUCCESS',
-      actionType: 'VIEW_PROJECT',
-      targetId: currentProject?.id,
-      targetName: currentProject?.name
-    });
+      set((state) => {
+        if (!state.currentProject) return {};
+        if (state.currentProject.members.some(m => m.userId === user.id)) return {};
+
+        // Check if user already in users list
+        const userExists = state.users.some(u => u.id === user.id);
+
+        return {
+          currentProject: { ...state.currentProject, members: [...state.currentProject.members, newMember] },
+          // Add user to users list nếu chưa có
+          users: userExists ? state.users : [...state.users, user]
+        };
+      });
+
+      get().addDetailedNotification({
+        message: `Invited ${user.name} as ${role} to "${currentProject?.name}"`,
+        type: 'SUCCESS',
+        actionType: 'VIEW_PROJECT',
+        targetId: currentProject?.id,
+        targetName: currentProject?.name
+      });
+
+    } catch (error) {
+      console.error("Failed to invite member", error);
+      get().addNotification("Failed to invite member", "ERROR");
+    }
   },
 
-  removeMemberFromProject: (userId) => {
-    // TODO: API Call - [DELETE] /api/projects/{id}/members/{userId}
+  removeMemberFromProject: async (userId) => {
     const { currentUser, currentProject } = get();
+    if (!currentProject || !currentUser) return;
 
-    // Check if current user is owner
-    if (!currentUser || currentProject?.ownerId !== currentUser.id) {
+    if (currentProject.ownerId !== currentUser.id) {
       get().addNotification("Only project owner can remove members", "WARNING");
       return;
     }
 
-    // Cannot remove owner
-    if (userId === currentProject?.ownerId) {
+    if (userId === currentProject.ownerId) {
       get().addNotification("Cannot remove project owner", "WARNING");
       return;
     }
 
     const user = get().users.find(u => u.id === userId);
-    const projectName = currentProject?.name;
 
-    set((state) => {
-      if (!state.currentProject) return {};
-      const removedMember = state.currentProject.members.find(m => m.userId === userId);
-      const updatedMembers = state.currentProject.members.filter(m => m.userId !== userId);
+    try {
+      await removeProjectMember(currentProject.id, userId);
 
-      // Unassign all tasks assigned to this member
-      const updatedTasks = state.tasks.map(task =>
-        task.assigneeId === userId ? { ...task, assigneeId: undefined } : task
-      );
+      set((state) => {
+        if (!state.currentProject) return {};
 
-      if (user) {
-        const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'removed member', target: user.name, createdAt: new Date().toISOString() };
-        state.activities.unshift(log);
-      }
-
-      return {
-        currentProject: { ...state.currentProject, members: updatedMembers },
-        tasks: updatedTasks,
-        activities: state.activities
-      };
-    });
-
-    // Notify project owner (or other admins) about removal with project context
-    if (user) {
-      get().addDetailedNotification({
-        message: `Removed ${user.name} from "${projectName}"`,
-        type: 'SUCCESS',
-        actionType: 'VIEW_PROJECT',
-        targetId: currentProject?.id,
-        targetName: projectName
+        return {
+          currentProject: {
+            ...state.currentProject,
+            members: state.currentProject.members.filter(m => m.userId !== userId)
+          },
+          tasks: state.tasks.map(task =>
+            task.assigneeId === userId ? { ...task, assigneeId: undefined } : task
+          )
+        };
       });
 
-      // TODO: Notify the removed user via email/system notification about removal
-      // In a real app, send notification to the removed user
-      // Example: fetch(`/api/notifications/users/${userId}`, ...)
-      // This could be handled by backend when processing the removal
+      if (user) {
+        get().addDetailedNotification({
+          message: `Removed ${user.name} from "${currentProject.name}"`,
+          type: 'SUCCESS',
+          actionType: 'VIEW_PROJECT',
+          targetId: currentProject.id,
+          targetName: currentProject.name
+        });
+      }
+
+    } catch (err) {
+      console.error("Failed to remove member", err);
+      get().addNotification("Failed to remove member", "ERROR");
     }
   },
 

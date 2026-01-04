@@ -4,11 +4,15 @@ import { Layout, AlertCircle } from 'lucide-react';
 
 export const Auth: React.FC = () => {
   const { login, register, isLoading } = useStore();
+
+  // State quản lý tab (Đăng nhập / Đăng ký)
   const [isLogin, setIsLogin] = useState(true);
-  const [loginError, setLoginError] = useState(''); // State dùng để hiện thông báo lỗi đỏ
+
+  // State thông báo lỗi
+  const [loginError, setLoginError] = useState('');
 
   // Login State
-  const [email, setEmail] = useState('alice@minijira.app');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   // Register State
@@ -17,39 +21,59 @@ export const Auth: React.FC = () => {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
 
+  // Hàm chuyển đổi tab (Xóa dữ liệu cũ cho sạch)
+  const toggleMode = () => {
+    setIsLogin(!isLogin);
+    setLoginError('');
+    // Reset form
+    setEmail(''); setPassword('');
+    setRegFirstName(''); setRegLastName(''); setRegEmail(''); setRegPassword('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError(''); // Xóa lỗi cũ trước khi submit mới
+    setLoginError(''); // Xóa lỗi cũ
 
     try {
       if (isLogin) {
+        // --- LOGIC ĐĂNG NHẬP ---
         if (!email || !password) {
-          setLoginError('Vui lòng nhập đầy đủ email và mật khẩu');
+          setLoginError('Please enter both email and password.');
           return;
         }
-        // Gọi hàm login, nếu sai pass nó sẽ nhảy xuống catch
         await login(email, password);
+        // Nếu thành công, Store sẽ tự cập nhật currentUser -> App sẽ tự chuyển sang Workspace
       } else {
-        // Gọi hàm register, nếu trùng email nó sẽ nhảy xuống catch
+        // --- LOGIC ĐĂNG KÝ ---
+        if (!regFirstName || !regLastName || !regEmail || !regPassword) {
+          setLoginError('Please fill in all fields.');
+          return;
+        }
+
         await register({
           firstName: regFirstName,
           lastName: regLastName,
           email: regEmail,
-          password: regPassword // (Lưu ý: Mock Hash chỉ để minh họa, thực tế ko làm ở frontend)
+          password: regPassword
         });
+
+        // Nếu đăng ký thành công mà không auto-login (tùy logic store), 
+        // bạn có thể muốn tự chuyển về trang login:
+        // setIsLogin(true);
+        // setLoginError('Account created! Please log in.');
       }
     } catch (error: any) {
-      // Bắt lỗi từ Store ném ra và hiển thị lên UI
       console.error("Auth Error:", error);
-      // Lấy message từ Error object (VD: "Invalid password" hoặc "Email này đã được sử dụng")
-      setLoginError(error.message || "An error occurred. Please try again..");
+      // Hiển thị message lỗi từ Backend hoặc Store ném ra
+      setLoginError(error.message || "An error occurred. Please try again.");
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
-        {/* ... (Phần Header Logo giữ nguyên) ... */}
+
+        {/* Header Logo */}
         <div className="bg-blue-600 p-8 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-2xl mx-auto flex items-center justify-center backdrop-blur-sm mb-4">
             <Layout className="w-8 h-8 text-white" />
@@ -64,9 +88,8 @@ export const Auth: React.FC = () => {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* ... (Các input giữ nguyên) ... */}
 
-            {/* Phần hiển thị lỗi đã có sẵn, giờ nó sẽ hoạt động nhờ setLoginError */}
+            {/* Hiển thị Lỗi (Error Message) */}
             {loginError && (
               <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg animate-in fade-in slide-in-from-top-1">
                 <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
@@ -75,6 +98,7 @@ export const Auth: React.FC = () => {
             )}
 
             {isLogin ? (
+              // --- FORM LOGIN ---
               <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
@@ -100,6 +124,7 @@ export const Auth: React.FC = () => {
                 </div>
               </>
             ) : (
+              // --- FORM REGISTER ---
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -138,18 +163,12 @@ export const Auth: React.FC = () => {
               {isLogin ? "Don't have an account?" : "Already have an account?"}
               <span
                 className="text-blue-600 dark:text-blue-400 font-medium cursor-pointer ml-1 hover:underline"
-                onClick={() => { setIsLogin(!isLogin); setLoginError(''); }}
+                onClick={toggleMode}
               >
                 {isLogin ? 'Register' : 'Login'}
               </span>
             </p>
-            {isLogin && (
-              <div className="mt-4 text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded">
-                Demo Accounts (password: password123):<br />
-                alice@minijira.app (Owner)<br />
-                bob@minijira.app (Member)
-              </div>
-            )}
+            {/* ĐÃ XÓA PHẦN DEMO ACCOUNTS Ở ĐÂY */}
           </div>
         </div>
       </div>

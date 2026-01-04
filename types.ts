@@ -23,7 +23,6 @@ export interface User {
   name: string;
   email: string;
   avatar: string;
-  title?: string;
   bio?: string;
   isOnline?: boolean;
 }
@@ -42,9 +41,10 @@ export interface Comment {
 
 export interface ActivityLog {
   id: string;
-  userId: string;
+  userId?: string;
   action: string;
   target: string;
+  taskId?: string;
   createdAt: string;
 }
 
@@ -59,15 +59,15 @@ export interface FileAttachment {
 export interface Task {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   status: TaskStatus;
   priority: Priority;
   assigneeId?: string;
-  tags: string[];
+  tags?: string[];
   startDate?: string;
-  dueDate: string;
+  dueDate?: string;
   createdAt: string;
-  comments: Comment[];
+  comments?: Comment[];
   files?: FileAttachment[];
   projectId: string;
   // Recursive relationship
