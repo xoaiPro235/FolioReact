@@ -359,6 +359,10 @@ export const removeProjectMember = async (projectId: string, userId: string): Pr
   return await axiosClient.delete(`/project/${projectId}/members/${userId}`);
 }
 
+export const updateProjectMemberRole = async (projectId: string, userId: string, newRole: Role): Promise<void> => {
+  return await axiosClient.patch(`/project/${projectId}/members/${userId}`, { role: newRole });
+};
+
 // --------TASK------------
 
 export const fetchTasks = async (projectId: string): Promise<Task[]> => {

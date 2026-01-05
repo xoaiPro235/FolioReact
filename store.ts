@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole } from './services/api';
 import { supabase } from './supabaseClient';
 
 interface AppState {
@@ -126,14 +126,21 @@ export const useStore = create<AppState>((set, get) => ({
 
         set({ currentUser: user });
 
-        // Load workspace first
-        await get().goToWorkspace();
+        // Check if there was a previous view/project open
+        const lastView = localStorage.getItem('lastView') as ViewState;
+        const lastProjectId = localStorage.getItem('lastProjectId');
 
-        // Check if there was a previous project open
-        const previousProjectId = localStorage.getItem('lastProjectId');
-        if (previousProjectId) {
+        if (lastView === 'PROJECT' && lastProjectId) {
+          // MUST load workspace data first so projects list is populated
+          await get().loadWorkspaceData(data.session.user.id);
           // Restore to previous project
-          await get().loadProjectData(previousProjectId);
+          await get().loadProjectData(lastProjectId);
+        } else if (lastView === 'PROFILE') {
+          await get().loadWorkspaceData(data.session.user.id);
+          get().goToProfile();
+        } else {
+          // Default to workspace
+          await get().goToWorkspace();
         }
       }
     } catch (error) {
@@ -154,6 +161,10 @@ export const useStore = create<AppState>((set, get) => ({
 
       // 2. Lưu currentUser vào Store ngay lập tức
       set({ currentUser: user });
+
+      // Reset view persistence on new login
+      localStorage.setItem('lastView', 'WORKSPACE');
+      localStorage.removeItem('lastProjectId');
 
       await get().goToWorkspace();
 
@@ -195,6 +206,8 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   logout: () => {
+    localStorage.removeItem('lastView');
+    localStorage.removeItem('lastProjectId');
     set({ currentUser: null, currentView: 'AUTH', currentProject: null });
   },
 
@@ -286,6 +299,10 @@ export const useStore = create<AppState>((set, get) => ({
           isLoading: false
         });
 
+        // Persist view state
+        localStorage.setItem('lastView', 'WORKSPACE');
+        localStorage.removeItem('lastProjectId');
+
       } catch (error) {
         console.error("Lỗi tải workspace:", error);
         set({ isLoading: false });
@@ -296,6 +313,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   goToProfile: () => {
+    localStorage.setItem('lastView', 'PROFILE');
     set({ currentView: 'PROFILE', selectedTaskId: null });
   },
 
@@ -408,6 +426,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, currentView: 'PROJECT' });
     try {
       // Save projectId to localStorage for restore on reload
+      localStorage.setItem('lastView', 'PROJECT');
       localStorage.setItem('lastProjectId', projectId);
 
       const project = get().projects.find(p => p.id === projectId) || null;
@@ -708,17 +727,41 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
-  changeMemberRole: (userId, newRole) => {
-    // TODO: API Call - [PATCH] /api/projects/{id}/members/{userId}
-    set((state) => {
-      if (!state.currentProject) return {};
-      const updatedMembers = state.currentProject.members.map(m =>
-        m.userId === userId ? { ...m, role: newRole } : m
-      );
-      return {
-        currentProject: { ...state.currentProject, members: updatedMembers }
-      };
-    });
+  changeMemberRole: async (userId, newRole) => {
+    const { currentProject, users } = get();
+    if (!currentProject) return;
+
+    // Kiểm tra member tồn tại
+    const memberExists = currentProject.members.some(m => m.userId === userId);
+    if (!memberExists) {
+      get().addNotification("Member not found in project", "WARNING");
+      return;
+    }
+
+    try {
+      // Call API
+      await updateProjectMemberRole(currentProject.id, userId, newRole);
+
+      // Update state
+      set((state) => {
+        if (!state.currentProject) return {};
+        const updatedMembers = state.currentProject.members.map(m =>
+          m.userId === userId ? { ...m, role: newRole } : m
+        );
+        return {
+          currentProject: { ...state.currentProject, members: updatedMembers }
+        };
+      });
+
+      // Success notification
+      const user = users.find(u => u.id === userId);
+      const memberName = user?.name || 'User';
+      get().addNotification(`Updated ${memberName}'s role to ${newRole}`, "SUCCESS");
+
+    } catch (error) {
+      console.error("Failed to update member role", error);
+      get().addNotification("Failed to update member role", "ERROR");
+    }
   },
 
   inviteUserToProject: async (user, role) => {
