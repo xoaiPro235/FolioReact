@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ViewState, TaskStatus, Priority, Role, TabType } from '../types';
 import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { LayoutGrid, Kanban, List, Calendar as CalendarIcon, Users, ArrowLeft, History, Plus, Activity, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { TaskModal } from './TaskModal';
 import { CreateTaskModal } from './CreateTaskModal';
@@ -38,7 +39,20 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
     }
   }, [selectedIssue, selectedTaskId, setSelectedTask]);
 
-  if (!currentProject) return <div className="p-10 dark:text-white flex items-center justify-center">Loading Project...</div>;
+  if (!currentProject) return (
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-8 space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="space-y-2">
+          <div className="h-8 w-64 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+          <div className="h-4 w-96 bg-slate-100 dark:bg-slate-800/50 animate-pulse rounded-md" />
+        </div>
+      </div>
+      <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800">
+        {[1, 2, 3, 4].map(i => <div key={i} className="h-10 w-24 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-t-lg" />)}
+      </div>
+      <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 animate-pulse" />
+    </div>
+  );
 
   const onlineMembers = currentProject.members
     .map(m => users.find(u => u.id === m.userId))
@@ -125,10 +139,9 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 overflow-hidden relative">
         <div className={`absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 p-4 sm:p-8 ${currentTab === 'kanban' ? 'flex flex-col' : ''}`}>
-          <div className={`mx-auto w-full h-full ${currentTab === 'kanban' ? 'flex flex-col' : 'max-w-[1600px]'}`}>
+          <div className={`mx-auto w-full ${currentTab === 'kanban' ? 'flex-1 flex flex-col' : 'max-w-[1600px] min-h-full'}`}>
             {children}
           </div>
         </div>
@@ -151,8 +164,16 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
 const TabButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${active ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap relative ${active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
   >
     {icon} {label}
+    {active && (
+      <motion.div
+        layoutId="activeTab"
+        className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"
+        initial={false}
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      />
+    )}
   </button>
 );

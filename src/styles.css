@@ -2,8 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+    .glass-effect {
+        @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-white/20 dark:border-slate-800/50;
+    }
+    
+    .card-shadow {
+        @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)];
+    }
+}
+
+.dark {
+    color-scheme: dark;
+}
+
 body {
     font-family: 'Inter', sans-serif;
+    @apply transition-colors duration-300;
 }
 
 /* Smooth transitions for theme switching */

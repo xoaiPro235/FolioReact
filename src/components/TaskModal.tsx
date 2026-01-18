@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TaskStatus, Priority, ActivityLog, Role } from '../types';
 import { X, Calendar, MessageSquare, Plus, Trash2, Paperclip, MoreVertical, CheckCircle, Clock, Tag, UserPlus, AlertCircle, History, ChevronRight, Hash, Type, AlignLeft, CornerUpLeft, Send, CheckSquare } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { useStore } from '../store';
+import { useTasks, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 import { CreateTaskModal } from './CreateTaskModal';
 import { UserSelect } from './UserSelect';
 import {
@@ -16,17 +18,19 @@ export const TaskModal: React.FC = () => {
   const {
     selectedTaskId,
     setSelectedTask,
-    tasks,
     users,
     currentUser,
-    patchTask,
-    deleteTask,
     addComment,
     currentProject,
     addAttachment,
     removeAttachment,
     getUserRole
   } = useStore();
+
+  const { id: projectId } = useParams<{ id: string }>();
+  const { data: tasks = [] } = useTasks(projectId);
+  const updateMutation = useUpdateTask();
+  const deleteMutation = useDeleteTask();
 
   const handleClose = () => {
     const nextParams = new URLSearchParams(searchParams);
@@ -90,26 +94,26 @@ export const TaskModal: React.FC = () => {
   const readOnly = role === Role.VIEWER || role === null;
 
   const handleStatusChange = (newStatus: string) => {
-    patchTask(task.id, { status: newStatus as TaskStatus });
+    updateMutation.mutate({ taskId: task.id, updates: { status: newStatus as TaskStatus } });
   };
 
   const handleAssigneeChange = (newUserId: string) => {
-    patchTask(task.id, { assigneeId: newUserId });
+    updateMutation.mutate({ taskId: task.id, updates: { assigneeId: newUserId } });
   };
 
   const handleDateChange = (field: 'startDate' | 'dueDate', value: string) => {
-    patchTask(task.id, { [field]: value });
+    updateMutation.mutate({ taskId: task.id, updates: { [field]: value } });
   };
 
   const handleBlurTitle = () => {
     if (localTitle !== task.title) {
-      patchTask(task.id, { title: localTitle });
+      updateMutation.mutate({ taskId: task.id, updates: { title: localTitle } });
     }
   };
 
   const handleBlurDesc = () => {
     if (localDesc !== task.description) {
-      patchTask(task.id, { description: localDesc });
+      updateMutation.mutate({ taskId: task.id, updates: { description: localDesc } });
     }
   };
 
@@ -134,10 +138,10 @@ export const TaskModal: React.FC = () => {
 
   const executeDelete = () => {
     if (deleteConfirm.type === 'TASK') {
-      deleteTask(deleteConfirm.id);
+      deleteMutation.mutate(deleteConfirm.id);
       handleClose();
     } else if (deleteConfirm.type === 'SUBTASK') {
-      deleteTask(deleteConfirm.id);
+      deleteMutation.mutate(deleteConfirm.id);
     } else if (deleteConfirm.type === 'ATTACHMENT') {
       removeAttachment(task.id, deleteConfirm.id);
     }
@@ -152,10 +156,21 @@ export const TaskModal: React.FC = () => {
   const progress = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={handleClose} />
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        onClick={handleClose}
+      />
 
-      <div className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] border border-slate-200 dark:border-slate-800">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] border border-slate-200 dark:border-slate-800 z-10"
+      >
 
         {/* Header */}
         <div className="flex flex-col gap-4 p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20">
@@ -244,7 +259,7 @@ export const TaskModal: React.FC = () => {
                       className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
                     >
                       <div className="flex-shrink-0">
-                        <StatusSelect minimal value={st.status} onChange={(val) => patchTask(st.id, { status: val })} readOnly={readOnly} />
+                        <StatusSelect minimal value={st.status} onChange={(val) => updateMutation.mutate({ taskId: st.id, updates: { status: val } })} readOnly={readOnly} />
                       </div>
                       <span
                         className={`flex-1 text-sm font-medium cursor-pointer hover:text-blue-600 ${st.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}
@@ -253,11 +268,11 @@ export const TaskModal: React.FC = () => {
                         {st.title}
                       </span>
                       <div className="flex items-center gap-3">
-                        <PrioritySelect minimal value={st.priority} onChange={(val) => patchTask(st.id, { priority: val })} readOnly={readOnly} />
+                        <PrioritySelect minimal value={st.priority} onChange={(val) => updateMutation.mutate({ taskId: st.id, updates: { priority: val } })} readOnly={readOnly} />
                         <UserSelect
                           users={projectMembers}
                           selectedUserId={st.assigneeId}
-                          onChange={(uid) => patchTask(st.id, { assigneeId: uid })}
+                          onChange={(uid) => updateMutation.mutate({ taskId: st.id, updates: { assigneeId: uid } })}
                           readOnly={readOnly}
                           className="w-32"
                         />
@@ -413,7 +428,7 @@ export const TaskModal: React.FC = () => {
                   <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5 block">Priority</label>
                   <PrioritySelect
                     value={task.priority}
-                    onChange={(val) => patchTask(task.id, { priority: val })}
+                    onChange={(val) => updateMutation.mutate({ taskId: task.id, updates: { priority: val } })}
                     readOnly={readOnly}
                     className="w-full"
                     large
@@ -427,8 +442,7 @@ export const TaskModal: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
+      </motion.div>
       {isCreateSubtaskOpen && (
         <CreateTaskModal
           isOpen={isCreateSubtaskOpen}

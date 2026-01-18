@@ -15,8 +15,11 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Edit2, CheckSquare } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from './Shared';
 import { CreateTaskModal } from './CreateTaskModal';
+import { useTasks, useUpdateTask } from '../hooks/useTasks';
+import { KanbanSkeleton } from './Skeleton';
 
 const KanbanCard: React.FC<{ task: Task; onClick: () => void; canEdit: boolean }> = ({ task, onClick, canEdit }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -36,7 +39,6 @@ const KanbanCard: React.FC<{ task: Task; onClick: () => void; canEdit: boolean }
   const completedSubtasks = subtasks.filter(s => s.status === TaskStatus.DONE).length;
   const totalSubtasks = subtasks.length;
 
-  // Use Shared Config for styles
   const PriorityIcon = PRIORITY_CONFIG[task.priority].icon;
 
   if (isDragging) {
@@ -46,16 +48,21 @@ const KanbanCard: React.FC<{ task: Task; onClick: () => void; canEdit: boolean }
   }
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      className={`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all group relative flex flex-col gap-3 ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+      className={`bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-700 transition-all group relative flex flex-col gap-3 ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
       onClick={onClick}
     >
       <div className="flex justify-between items-start gap-2">
-        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug">{task.title}</h4>
+        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{task.title}</h4>
         {canEdit && (
           <button onClick={(e) => { e.stopPropagation(); onClick(); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 transition-opacity bg-slate-50 dark:bg-slate-700 rounded-md">
             <Edit2 className="w-3.5 h-3.5" />
@@ -63,25 +70,28 @@ const KanbanCard: React.FC<{ task: Task; onClick: () => void; canEdit: boolean }
         )}
       </div>
 
-      {/* Subtask Preview */}
       {totalSubtasks > 0 && (
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <CheckSquare className="w-3.5 h-3.5" />
-          <span>{completedSubtasks}/{totalSubtasks} Subtasks</span>
+          <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 transition-all duration-500"
+              style={{ width: `${(completedSubtasks / totalSubtasks) * 100}%` }}
+            />
+          </div>
+          <span className="font-medium whitespace-nowrap">{completedSubtasks}/{totalSubtasks}</span>
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 dark:border-slate-700/50">
-        <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border font-medium ${PRIORITY_CONFIG[task.priority].color}`}>
-          <PriorityIcon className="w-3.5 h-3.5" />
+        <div className={`flex items-center gap-1.5 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-bold ${PRIORITY_CONFIG[task.priority].color}`}>
+          <PriorityIcon className="w-3 h-3" />
           {task.priority}
         </div>
         {assignee && (
-          <img src={assignee.avatar} alt={assignee.name} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 shadow-sm" title={assignee.name} />
+          <img src={assignee.avatar} alt={assignee.name} className="w-7 h-7 rounded-full border-2 border-white dark:border-slate-800 shadow-sm" title={assignee.name} />
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -100,14 +110,16 @@ const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) =>
 
       <div ref={setNodeRef} className="flex-1 bg-slate-100/50 dark:bg-slate-900/30 rounded-2xl p-3 space-y-3 overflow-y-auto border border-dashed border-slate-200 dark:border-slate-800 relative group/column">
         <SortableContext items={tasks.map((t: Task) => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((task: Task) => (
-            <KanbanCard
-              key={task.id}
-              task={task}
-              onClick={() => onTaskClick(task.id)}
-              canEdit={canEdit}
-            />
-          ))}
+          <AnimatePresence mode="popLayout">
+            {tasks.map((task: Task) => (
+              <KanbanCard
+                key={task.id}
+                task={task}
+                onClick={() => onTaskClick(task.id)}
+                canEdit={canEdit}
+              />
+            ))}
+          </AnimatePresence>
         </SortableContext>
 
         {/* Contextual Create Button */}
@@ -127,13 +139,10 @@ const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) =>
 export const KanbanBoard: React.FC = () => {
   const { id: projectId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tasks, updateTaskStatus, getUserRole, globalTaskSearch, loadProjectTasks, isProjectTasksLoaded } = useStore();
+  const { getUserRole, globalTaskSearch } = useStore();
 
-  React.useEffect(() => {
-    if (projectId && !isProjectTasksLoaded) {
-      loadProjectTasks(projectId);
-    }
-  }, [projectId, loadProjectTasks, isProjectTasksLoaded]);
+  const { data: tasks = [], isLoading } = useTasks(projectId);
+  const updateMutation = useUpdateTask();
 
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -175,13 +184,12 @@ export const KanbanBoard: React.FC = () => {
 
       if (isContainer) {
         if (currentTask.status !== over.id) {
-          updateTaskStatus(active.id as string, over.id as TaskStatus);
+          updateMutation.mutate({ taskId: active.id as string, updates: { status: over.id as TaskStatus } });
         }
       } else {
-        // If dropped over another task
         const overTask = tasks.find(t => t.id === over.id);
         if (overTask && currentTask.status !== overTask.status) {
-          updateTaskStatus(active.id as string, overTask.status);
+          updateMutation.mutate({ taskId: active.id as string, updates: { status: overTask.status } });
         }
       }
     }
@@ -194,6 +202,8 @@ export const KanbanBoard: React.FC = () => {
   };
 
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
+
+  if (isLoading) return <KanbanSkeleton />;
 
   return (
     <div className="h-full flex flex-col w-full">
@@ -215,8 +225,15 @@ export const KanbanBoard: React.FC = () => {
             />
           ))}
         </div>
-        <DragOverlay>
-          {activeTask ? <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-2xl border-2 border-blue-500 w-[350px] h-[140px]" /> : null}
+        <DragOverlay zIndex={100}>
+          {activeTask ? (
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-2xl border-2 border-blue-500 w-[350px] rotate-3 cursor-grabbing">
+              <h4 className="text-base font-medium text-slate-900 dark:text-slate-100 line-clamp-2">{activeTask.title}</h4>
+              <div className="flex items-center gap-1.5 mt-3 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-bold w-fit bg-slate-50 dark:bg-slate-700/50">
+                {activeTask.priority}
+              </div>
+            </div>
+          ) : null}
         </DragOverlay>
       </DndContext>
 

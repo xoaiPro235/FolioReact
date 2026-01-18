@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { useStore } from '../store';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
@@ -8,10 +8,15 @@ import {
 import { TaskStatus, Task } from '../types';
 import { STATUS_CONFIG, StatusBadge, PriorityBadge } from './Shared'; // Đã thêm PriorityBadge
 import { Activity, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { useTasks } from '../hooks/useTasks';
+import { Skeleton } from './Skeleton';
 
 export const Overview: React.FC = () => {
+  const { id: projectId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tasks, users, activities } = useStore();
+  const { users, activities } = useStore();
+
+  const { data: tasks = [], isLoading } = useTasks(projectId);
 
   const handleTaskClick = (taskId: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -69,6 +74,39 @@ export const Overview: React.FC = () => {
       return d >= now && d <= threeDaysFromNow && t.status !== TaskStatus.DONE;
     }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allTasks]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center space-x-4">
+              <Skeleton className="h-10 w-10 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-6 w-8" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 h-80">
+            <Skeleton className="h-6 w-40 mb-6" />
+            <div className="flex justify-center flex-col items-center h-48 space-y-4">
+              <Skeleton className="h-32 w-32 rounded-full" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 h-80">
+            <Skeleton className="h-6 w-40 mb-6" />
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" count={4} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-8">
