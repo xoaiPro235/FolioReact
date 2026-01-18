@@ -1,50 +1,61 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TaskStatus, Priority, ActivityLog, Role } from '../types';
-import {
-  X, CheckSquare, MessageSquare, Send, Plus, Trash2,
-  CornerUpLeft, Calendar, History, Clock
-} from 'lucide-react';
+import { X, Calendar, MessageSquare, Plus, Trash2, Paperclip, MoreVertical, CheckCircle, Clock, Tag, UserPlus, AlertCircle, History, ChevronRight, Hash, Type, AlignLeft, CornerUpLeft, Send, CheckSquare } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { CreateTaskModal } from './CreateTaskModal';
 import { UserSelect } from './UserSelect';
 import {
   StatusSelect, PrioritySelect, AttachmentList, ConfirmDialog,
-  StatusBadge, PriorityBadge // Import Badge
+  StatusBadge, PriorityBadge
 } from './Shared';
 import { fetchTaskActivities } from '../services/api';
-import { read } from 'fs';
 
 export const TaskModal: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
-    users, currentUser, currentProject, deleteTask, addComment,
-    tasks, patchTask, selectedTaskId, setSelectedTask,
-    addAttachment, removeAttachment, getUserRole
+    selectedTaskId,
+    setSelectedTask,
+    tasks,
+    users,
+    currentUser,
+    patchTask,
+    deleteTask,
+    addComment,
+    currentProject,
+    addAttachment,
+    removeAttachment,
+    getUserRole
   } = useStore();
+
+  const handleClose = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('selectedIssue');
+    setSearchParams(nextParams);
+  };
+
+  const navigateToTask = (taskId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('selectedIssue', taskId);
+    setSearchParams(nextParams);
+  };
 
   const [commentText, setCommentText] = useState('');
   const [isCreateSubtaskOpen, setIsCreateSubtaskOpen] = useState(false);
-
-  // --- STATE TABS ---
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
   const [taskLogs, setTaskLogs] = useState<ActivityLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
-  // Confirmation Dialog State
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     type: 'TASK' | 'SUBTASK' | 'ATTACHMENT';
     id: string;
   }>({ isOpen: false, type: 'TASK', id: '' });
 
-  // Local State
   const [localTitle, setLocalTitle] = useState('');
   const [localDesc, setLocalDesc] = useState('');
 
-  const task = tasks.find(t => t.id === selectedTaskId);
-
-  // const projectMembers = users.filter(u =>
-  //   currentProject?.members.some(m => m.userId === u.id)
-  // );
+  const task = useMemo(() => tasks.find(t => t.id === selectedTaskId), [tasks, selectedTaskId]);
 
   const projectMembers = useMemo(() => {
     return users.filter(u => {
@@ -60,7 +71,6 @@ export const TaskModal: React.FC = () => {
     }
   }, [task?.id, task?.title, task?.description]);
 
-  // Load Logs
   useEffect(() => {
     if (activeTab === 'activity' && task?.id) {
       setIsLoadingLogs(true);
@@ -110,7 +120,6 @@ export const TaskModal: React.FC = () => {
     setCommentText('');
   };
 
-  // Delete Handlers
   const handleDeleteTaskClick = () => {
     setDeleteConfirm({ isOpen: true, type: 'TASK', id: task.id });
   };
@@ -126,6 +135,7 @@ export const TaskModal: React.FC = () => {
   const executeDelete = () => {
     if (deleteConfirm.type === 'TASK') {
       deleteTask(deleteConfirm.id);
+      handleClose();
     } else if (deleteConfirm.type === 'SUBTASK') {
       deleteTask(deleteConfirm.id);
     } else if (deleteConfirm.type === 'ATTACHMENT') {
@@ -138,13 +148,12 @@ export const TaskModal: React.FC = () => {
   };
 
   const getUser = (userId: string) => users.find(u => u.id === userId);
-
   const completedSubtasks = subtasks.filter(s => s.status === TaskStatus.DONE).length;
   const progress = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedTask(null)} />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={handleClose} />
 
       <div className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] border border-slate-200 dark:border-slate-800">
 
@@ -152,7 +161,7 @@ export const TaskModal: React.FC = () => {
         <div className="flex flex-col gap-4 p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             {isSubtask && parentTask && (
-              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-900/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" onClick={() => setSelectedTask(parentTask.id)}>
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-900/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" onClick={() => navigateToTask(parentTask.id)}>
                 <CornerUpLeft className="w-3 h-3" />
                 <span className="font-medium">Belongs to: {parentTask.title}</span>
               </div>
@@ -177,7 +186,7 @@ export const TaskModal: React.FC = () => {
                   <Trash2 className="w-5 h-5" />
                 </button>
               )}
-              <button onClick={() => setSelectedTask(null)} className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
+              <button onClick={handleClose} className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -239,7 +248,7 @@ export const TaskModal: React.FC = () => {
                       </div>
                       <span
                         className={`flex-1 text-sm font-medium cursor-pointer hover:text-blue-600 ${st.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}
-                        onClick={() => setSelectedTask(st.id)}
+                        onClick={() => navigateToTask(st.id)}
                       >
                         {st.title}
                       </span>
@@ -248,7 +257,7 @@ export const TaskModal: React.FC = () => {
                         <UserSelect
                           users={projectMembers}
                           selectedUserId={st.assigneeId}
-                          onChange={(id) => patchTask(st.id, { assigneeId: id })}
+                          onChange={(uid) => patchTask(st.id, { assigneeId: uid })}
                           readOnly={readOnly}
                           className="w-32"
                         />
@@ -277,34 +286,25 @@ export const TaskModal: React.FC = () => {
               </div>
             )}
 
-            {/* TAB SYSTEM: Comments & Activities */}
+            {/* TAB SYSTEM */}
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-
-              {/* Tab Navigation */}
               <div className="flex items-center gap-6 mb-6 border-b border-slate-100 dark:border-slate-800">
                 <button
                   onClick={() => setActiveTab('comments')}
-                  className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'comments'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-                    }`}
+                  className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}
                 >
                   <MessageSquare className="w-4 h-4" /> Comments ({task.comments.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('activity')}
-                  className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'activity'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-                    }`}
+                  className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'activity' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}
                 >
                   <History className="w-4 h-4" /> Activity Log
                 </button>
               </div>
 
-              {/* TAB CONTENT: COMMENTS */}
               {activeTab === 'comments' && (
-                <div className="space-y-6 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="space-y-6 mb-6">
                   {task.comments.length > 0 ? [...task.comments].reverse().map(c => {
                     const u = getUser(c.userId);
                     return (
@@ -313,15 +313,15 @@ export const TaskModal: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-baseline gap-2">
                             <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{u?.name}</span>
-                            <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleString()}</span>
                           </div>
-                          <div className="mt-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800">
+                          <div className="mt-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                             {c.content}
                           </div>
                         </div>
                       </div>
                     );
-                  }) : <p className="text-slate-400 text-sm italic ml-14">No comments yet.</p>}
+                  }) : <p className="text-slate-400 text-sm italic">No comments yet.</p>}
 
                   {!readOnly && (
                     <form onSubmit={handleAddComment} className="flex gap-4 mt-4">
@@ -332,9 +332,9 @@ export const TaskModal: React.FC = () => {
                           value={commentText}
                           onChange={e => setCommentText(e.target.value)}
                           placeholder="Write a comment..."
-                          className="w-full pl-4 pr-12 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm h-12"
+                          className="w-full pl-4 pr-12 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-all h-12"
                         />
-                        <button type="submit" disabled={!commentText.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50">
+                        <button type="submit" disabled={!commentText.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50">
                           <Send className="w-4 h-4" />
                         </button>
                       </div>
@@ -343,44 +343,24 @@ export const TaskModal: React.FC = () => {
                 </div>
               )}
 
-              {/* TAB CONTENT: ACTIVITY LOGS (TIMELINE + FULL CONTENT) */}
               {activeTab === 'activity' && (
-                <div className="space-y-6 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="space-y-6 mb-6">
                   {isLoadingLogs ? (
-                    <div className="flex items-center justify-center py-8 text-slate-400">
-                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Loading history...
-                    </div>
+                    <div className="flex items-center justify-center py-8 text-slate-400">Loading history...</div>
                   ) : taskLogs.length > 0 ? (
                     <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-4 space-y-6 py-2">
                       {taskLogs.map(log => {
                         const u = getUser(log.userId);
-                        // Kiểm tra loại action để hiển thị badge
-                        const isStatusChange = log.action.toLowerCase().includes('status');
-                        const isPriorityChange = log.action.toLowerCase().includes('priority');
-
                         return (
                           <div key={log.id} className="relative pl-6">
-                            {/* Dấu chấm trên timeline */}
                             <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600"></div>
-
                             <div className="flex flex-col gap-1">
-                              <div className="text-sm text-slate-700 dark:text-slate-300 leading-snug">
+                              <div className="text-sm text-slate-700 dark:text-slate-300">
                                 <span className="font-bold text-slate-900 dark:text-white mr-1">{u?.name || 'Unknown'}</span>
-
-                                {isStatusChange ? (
-                                  <span className="inline-flex items-center gap-1">
-                                    {log.action} <StatusBadge status={log.target} />
-                                  </span>
-                                ) : isPriorityChange ? (
-                                  <span className="inline-flex items-center gap-1">
-                                    {log.action} <PriorityBadge priority={log.target} />
-                                  </span>
-                                ) : (
-                                  <span>
-                                    {log.action} <span className="font-medium text-slate-900 dark:text-white">"{log.target}"</span>
-                                  </span>
-                                )}
+                                {log.action} <span
+                                  className="font-medium cursor-pointer hover:text-blue-500 hover:underline"
+                                  onClick={() => log.taskId && navigateToTask(log.taskId)}
+                                >"{log.target}"</span>
                               </div>
                               <div className="text-xs text-slate-400 flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
@@ -392,9 +372,8 @@ export const TaskModal: React.FC = () => {
                       })}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                      <History className="w-10 h-10 mb-2 opacity-20" />
-                      <p className="text-sm italic">No activity recorded for this task.</p>
+                    <div className="flex flex-col items-center justify-center py-8 text-slate-400 italic">
+                      <p>No activity recorded.</p>
                     </div>
                   )}
                 </div>
@@ -402,30 +381,30 @@ export const TaskModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Sidebar Properties */}
+          {/* Sidebar */}
           <div className="w-full md:w-80 bg-slate-50 dark:bg-slate-900/50 border-l border-slate-100 dark:border-slate-800 p-8 space-y-8 overflow-y-auto">
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Details</h4>
               <div className="space-y-6">
                 <div className="space-y-4">
-                  <div className="group">
+                  <div>
                     <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5 flex items-center gap-2"><Calendar className="w-3 h-3" /> Start Date</label>
                     <input
                       disabled={readOnly}
                       type="date"
-                      value={ task.startDate?.split('T')[0] ?? '' }
+                      value={task.startDate?.split('T')[0] ?? ''}
                       onChange={(e) => handleDateChange('startDate', e.target.value)}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 shadow-sm dark:[color-scheme:dark]"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none h-10"
                     />
                   </div>
-                  <div className="group">
+                  <div>
                     <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5 flex items-center gap-2"><Calendar className="w-3 h-3" /> Due Date</label>
                     <input
                       disabled={readOnly}
                       type="date"
                       value={task.dueDate?.split('T')[0] ?? ''}
                       onChange={(e) => handleDateChange('dueDate', e.target.value)}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 shadow-sm dark:[color-scheme:dark]"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none h-10"
                     />
                   </div>
                 </div>
@@ -436,17 +415,15 @@ export const TaskModal: React.FC = () => {
                     value={task.priority}
                     onChange={(val) => patchTask(task.id, { priority: val })}
                     readOnly={readOnly}
-                    className="w-full justify-center"
+                    className="w-full"
                     large
                   />
                 </div>
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
-              <div className="text-xs text-slate-400 space-y-2 font-mono">
-                <p>Created: {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}</p>
-              </div>
+            <div className="pt-6 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-400">
+              <p>Created: {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}</p>
             </div>
           </div>
         </div>
@@ -465,11 +442,7 @@ export const TaskModal: React.FC = () => {
         onClose={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}
         onConfirm={executeDelete}
         title={deleteConfirm.type === 'TASK' ? 'Delete Task?' : deleteConfirm.type === 'SUBTASK' ? 'Delete Subtask?' : 'Remove File?'}
-        description={
-          deleteConfirm.type === 'TASK' ? "Are you sure you want to delete this task? This action cannot be undone." :
-            deleteConfirm.type === 'SUBTASK' ? "Are you sure you want to delete this subtask?" :
-              "Are you sure you want to remove this attachment?"
-        }
+        description="Are you sure? This action cannot be undone."
         confirmText="Delete"
       />
     </div>

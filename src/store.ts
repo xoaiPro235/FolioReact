@@ -7,7 +7,7 @@ import { supabase } from './supabaseClient';
 interface AppState {
   // Global State
   currentUser: User | null;
-  currentView: ViewState;
+  // currentView: ViewState; // Routing handles this now
   theme: Theme;
   notifications: AppNotification[];
 
@@ -19,12 +19,13 @@ interface AppState {
   projects: Project[];
   workspaceSearchQuery: string;
 
-  // Project Scope State
   currentProject: Project | null;
-  tasks: Task[]; // Now contains both Parents and Subtasks flat
+  tasks: Task[];
   users: User[];
   activities: ActivityLog[];
   isLoading: boolean;
+  isProjectTasksLoaded: boolean;
+  isInitialAuthChecked: boolean;
 
   // Actions
   initializeAuth: () => Promise<void>;
@@ -46,18 +47,18 @@ interface AppState {
   deleteProject: (projectId: string) => void;
 
   loadProjectData: (projectId: string) => Promise<void>;
+  loadProjectInitial: (projectId: string) => Promise<void>;
+  loadProjectTasks: (projectId: string) => Promise<void>;
+  loadTaskById: (taskId: string) => Promise<void>;
   loadWorkspaceData: (userId: string) => Promise<void>;
 
   // Task Actions
-  addTask: (task: Task) => void;
-  updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
-  patchTask: (taskId: string, updates: Partial<Task>) => void;
-  deleteTask: (taskId: string) => void;
+  addTask: (task: Partial<Task>) => Promise<void>;
+  updateTaskStatus: (taskId: string, newStatus: TaskStatus) => Promise<void>;
+  patchTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
   addAttachment: (taskId: string, file: File) => Promise<void>;
   removeAttachment: (taskId: string, fileId: string) => void;
-
-  // Subtask Legacy Support (Prefer addTask)
-  //: (parentTaskId: string, title: string) => void;
 
   addComment: (taskId: string, content: string) => void;
 
@@ -78,7 +79,7 @@ interface AppState {
 
 export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
-  currentView: 'AUTH',
+  // currentView: 'AUTH',
   theme: 'light',
   notifications: [],
   selectedTaskId: null,
@@ -90,6 +91,8 @@ export const useStore = create<AppState>((set, get) => ({
   users: [],
   activities: [],
   isLoading: false,
+  isProjectTasksLoaded: false,
+  isInitialAuthChecked: false,
 
   // Initialize auth state from Supabase session
   initializeAuth: async () => {
@@ -139,12 +142,13 @@ export const useStore = create<AppState>((set, get) => ({
           await get().loadWorkspaceData(data.session.user.id);
           get().goToProfile();
         } else {
-          // Default to workspace
-          await get().goToWorkspace();
+          // Default to workspace handled by App.tsx router index route
         }
       }
     } catch (error) {
       console.error("Failed to initialize auth:", error);
+    } finally {
+      set({ isInitialAuthChecked: true });
     }
   },
 
@@ -160,13 +164,8 @@ export const useStore = create<AppState>((set, get) => ({
       }
 
       // 2. Lưu currentUser vào Store ngay lập tức
-      set({ currentUser: user });
-
-      // Reset view persistence on new login
-      localStorage.setItem('lastView', 'WORKSPACE');
-      localStorage.removeItem('lastProjectId');
-
-      await get().goToWorkspace();
+      set({ currentUser: user, isLoading: false });
+      // Navigation will be handled by App.tsx because currentUser is now set
 
     } catch (e) {
       // Nếu có lỗi thì tắt loading và ném lỗi ra
@@ -195,7 +194,7 @@ export const useStore = create<AppState>((set, get) => ({
         // Trường hợp hiếm: Đăng ký xong nhưng login thất bại 
         // (Ví dụ: Supabase bắt confirm email)
         console.warn("Auto-login failed:", loginError);
-        set({ isLoading: false, currentView: 'AUTH' }); // Quay về trang login để họ tự nhập lại
+        set({ isLoading: false }); // Quay về trang login để họ tự nhập lại
         get().addNotification("Please check email or login manually.", "INFO");
       }
 
@@ -208,7 +207,7 @@ export const useStore = create<AppState>((set, get) => ({
   logout: () => {
     localStorage.removeItem('lastView');
     localStorage.removeItem('lastProjectId');
-    set({ currentUser: null, currentView: 'AUTH', currentProject: null });
+    set({ currentUser: null, currentProject: null, selectedTaskId: null, tasks: [], activities: [] });
   },
 
   updateProfile: (data) => {
@@ -221,7 +220,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   deleteAccount: () => {
     // TODO: API Call - [DELETE] /api/users/me
-    set({ currentUser: null, currentView: 'AUTH' });
+    set({ currentUser: null });
     alert("Account deleted.");
   },
 
@@ -291,7 +290,7 @@ export const useStore = create<AppState>((set, get) => ({
 
         // 3. Cập nhật State
         set({
-          currentView: 'WORKSPACE',
+          // currentView: 'WORKSPACE',
           currentProject: null,
           selectedTaskId: null,
           projects: normalizedProjects,
@@ -308,13 +307,13 @@ export const useStore = create<AppState>((set, get) => ({
         set({ isLoading: false });
       }
     } else {
-      set({ currentView: 'WORKSPACE', currentProject: null, selectedTaskId: null });
+      set({ currentProject: null, selectedTaskId: null });
     }
   },
 
   goToProfile: () => {
     localStorage.setItem('lastView', 'PROFILE');
-    set({ currentView: 'PROFILE', selectedTaskId: null });
+    set({ selectedTaskId: null });
   },
 
   loadWorkspaceData: async (userId: string) => {
@@ -407,7 +406,7 @@ export const useStore = create<AppState>((set, get) => ({
       // 2. Cập nhật State khi thành công
       set((state) => ({
         projects: state.projects.filter(p => p.id !== projectId),
-        currentView: 'WORKSPACE',
+        // currentView: 'WORKSPACE',
         currentProject: null,
         isLoading: false
       }));
@@ -423,32 +422,29 @@ export const useStore = create<AppState>((set, get) => ({
 
 
   loadProjectData: async (projectId: string) => {
-    set({ isLoading: true, currentView: 'PROJECT' });
+    // Legacy support: combines both
+    await get().loadProjectInitial(projectId);
+    await get().loadProjectTasks(projectId);
+  },
+
+  loadProjectInitial: async (projectId: string) => {
+    set({ isLoading: true });
     try {
-      // Save projectId to localStorage for restore on reload
       localStorage.setItem('lastView', 'PROJECT');
       localStorage.setItem('lastProjectId', projectId);
 
       const project = get().projects.find(p => p.id === projectId) || null;
+      const memberUsers = await fetchProjectMembers(projectId);
 
-      const [tasks, memberUsers, activities] = await Promise.all([
-        fetchTasks(projectId),
-        fetchProjectMembers(projectId),  // User[] + role (with avatarUrl)
-        fetchActivities(projectId)
-      ]);
-
-      // Map Member[] → ProjectMember[]
       const projectMembers: ProjectMember[] = memberUsers.map((user: any) => ({
         userId: user.id,
         role: user.role
       }));
 
-      // Convert avatarUrl → avatar for User type consistency
       const users = memberUsers.map((user: any) => ({
         id: user.id,
         name: user.name,
         email: user.email,
-        // Use avatarUrl if exists, otherwise generate default from name
         avatar: user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`,
         bio: user.bio,
         isOnline: user.isOnline ?? false
@@ -466,14 +462,50 @@ export const useStore = create<AppState>((set, get) => ({
 
       set({
         currentProject: updatedProject,
-        tasks,
-        users,  // Mapped users with avatar field
-        activities,
+        users,
+        isProjectTasksLoaded: false, // Reset tasks loaded flag for new project
         isLoading: false
       });
     } catch (error) {
-      console.error("Failed to load project data", error);
+      console.error("Failed to load project initial data", error);
       set({ isLoading: false });
+    }
+  },
+
+  loadProjectTasks: async (projectId: string) => {
+    if (get().isProjectTasksLoaded && get().currentProject?.id === projectId) return;
+
+    set({ isLoading: true });
+    try {
+      const [tasks, activities] = await Promise.all([
+        fetchTasks(projectId),
+        fetchActivities(projectId)
+      ]);
+
+      set({
+        tasks,
+        activities,
+        isProjectTasksLoaded: true,
+        isLoading: false
+      });
+    } catch (error) {
+      console.error("Failed to load project tasks", error);
+      set({ isLoading: false });
+    }
+  },
+
+  loadTaskById: async (taskId: string) => {
+    // This could fetch full details including comments/history specifically if not already present
+    // For now, it ensures the task is in the tasks array with its latest state
+    try {
+      const { tasks } = get();
+      const existingTask = tasks.find(t => t.id === taskId);
+
+      // If we already have it, we might still want to refresh it or its activities
+      // But let's keep it simple for now as fetchTasks usually gets everything
+      // In a real Jira-like app, this would call GET /api/task/{id}
+    } catch (error) {
+      console.error("Failed to load task by ID", error);
     }
   },
 
@@ -525,8 +557,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (!task) return;
 
     // Kiểm tra xem có trường nào thực sự thay đổi không
-    const hasChanges = Object.keys(updates).some(key => {
-      // @ts-ignore
+    const hasChanges = (Object.keys(updates) as Array<keyof Task>).some(key => {
       return task[key] !== updates[key];
     });
 
@@ -668,7 +699,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     set(state => ({
       tasks: state.tasks.map(t =>
-        t.id === taskId ? { ...t, comments: [...t.comments, newComment] } : t
+        t.id === taskId ? { ...t, comments: [...(t.comments || []), newComment] } : t
       )
     }));
 

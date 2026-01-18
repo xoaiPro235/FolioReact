@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Task, TaskStatus, Priority, Role } from '../types';
 import { ChevronRight, ChevronDown, Plus, Trash2, Calendar } from 'lucide-react';
@@ -186,8 +187,36 @@ const TaskRow = ({ task, canEdit, onSelect, onAddSubtask, onAssigneeChange, onPa
     );
 };
 
-export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTask }) => {
-    const { tasks, addTask, patchTask, deleteTask, currentProject, globalTaskSearch, users } = useStore();
+export const TaskListView: React.FC = () => {
+    const { id: projectId } = useParams<{ id: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const {
+        tasks,
+        addTask,
+        patchTask,
+        deleteTask,
+        currentProject,
+        globalTaskSearch,
+        users,
+        getUserRole,
+        loadProjectTasks,
+        isProjectTasksLoaded
+    } = useStore();
+
+    useEffect(() => {
+        if (projectId && !isProjectTasksLoaded) {
+            loadProjectTasks(projectId);
+        }
+    }, [projectId, loadProjectTasks, isProjectTasksLoaded]);
+
+    const handleTaskClick = (taskId: string) => {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set('selectedIssue', taskId);
+        setSearchParams(nextParams);
+    };
+
+    const role = getUserRole();
+    const canEdit = role !== Role.VIEWER;
 
     // Filter users to only show project members
     // const projectMembers = users.filter(u =>
@@ -261,7 +290,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ canEdit, onSelectTas
                                     key={task.id}
                                     task={task}
                                     canEdit={canEdit}
-                                    onSelect={() => onSelectTask(task.id)}
+                                    onSelect={() => handleTaskClick(task.id)}
                                     onAddSubtask={(data: any) => handleQuickAddSubtask(task.id, data)}
                                     onAssigneeChange={(taskId: string, userId: string) => patchTask(taskId, { assigneeId: userId })}
                                     onPatch={patchTask}

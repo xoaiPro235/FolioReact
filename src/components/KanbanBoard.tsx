@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Task, TaskStatus, Role, Priority } from '../types';
 import {
@@ -125,8 +125,23 @@ const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) =>
 };
 
 export const KanbanBoard: React.FC = () => {
-  const { tasks, updateTaskStatus, getUserRole, globalTaskSearch, setSelectedTask } = useStore();
+  const { id: projectId } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { tasks, updateTaskStatus, getUserRole, globalTaskSearch, loadProjectTasks, isProjectTasksLoaded } = useStore();
+
+  React.useEffect(() => {
+    if (projectId && !isProjectTasksLoaded) {
+      loadProjectTasks(projectId);
+    }
+  }, [projectId, loadProjectTasks, isProjectTasksLoaded]);
+
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  const handleTaskClick = (taskId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('selectedIssue', taskId);
+    setSearchParams(nextParams);
+  };
 
   // Create Modal State specific to Kanban contextual add
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -194,7 +209,7 @@ export const KanbanBoard: React.FC = () => {
               key={status}
               status={status}
               tasks={rootTasks.filter(t => t.status === status)}
-              onTaskClick={setSelectedTask}
+              onTaskClick={handleTaskClick}
               canEdit={canEdit}
               onCreate={handleCreateClick}
             />

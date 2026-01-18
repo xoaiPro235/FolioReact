@@ -1,15 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import './styles.css';
-import { useStore } from './store';
-import { Auth } from './components/Auth';
-import { Workspace } from './components/Workspace';
-import { ProjectView } from './components/ProjectView';
-import { Profile } from './components/Profile';
+import React, { useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useStore } from '../store';
 import { Bell, LogOut, Layout, User, Moon, Sun, X, Settings, Home, Search, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 
-export default function App() {
+export const MainLayout: React.FC = () => {
     const {
-        currentView,
         currentUser,
         notifications,
         logout,
@@ -17,153 +12,73 @@ export default function App() {
         toggleTheme,
         dismissNotification,
         markNotificationRead,
-        goToWorkspace,
-        goToProfile,
-        globalTaskSearch,
-        setGlobalTaskSearch,
-        setSelectedTask,
         tasks,
-        loadProjectData,
-        projects
+        setGlobalTaskSearch,
+        globalTaskSearch
     } = useStore();
 
+    const navigate = useNavigate();
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
-    const [toastNotifications, setToastNotifications] = useState<any[]>([]);
-
-    // Ref để theo dõi ID thông báo mới nhất, tránh hiển thị lại khi re-render
-    const lastNotificationIdRef = useRef<string | null>(null);
-
-    // Initialize auth on app load
-    useEffect(() => {
-        const { initializeAuth } = useStore.getState();
-        initializeAuth();
-    }, []);
-
-    // Debounce Search
     const [searchTerm, setSearchTerm] = useState(globalTaskSearch);
 
-    useEffect(() => {
+    // Debounce Search
+    React.useEffect(() => {
         const handler = setTimeout(() => {
             setGlobalTaskSearch(searchTerm);
         }, 500);
         return () => clearTimeout(handler);
-    }, [searchTerm]);
-
-    // XỬ LÝ TOAST NOTIFICATION (Sửa lỗi lặp lại)
-    useEffect(() => {
-        if (notifications.length === 0) return;
-
-        const latestNotif = notifications[0]; // Lấy thông báo mới nhất
-
-        // Chỉ hiển thị nếu ID khác với ID đã xử lý lần trước
-        if (latestNotif.id !== lastNotificationIdRef.current) {
-            lastNotificationIdRef.current = latestNotif.id; // Cập nhật ref
-
-            // Thêm vào danh sách toast
-            setToastNotifications(prev => [latestNotif, ...prev]);
-
-            // Tự động ẩn sau 5 giây
-            setTimeout(() => {
-                setToastNotifications(prev => prev.filter(t => t.id !== latestNotif.id));
-            }, 5000);
-        }
-    }, [notifications]); // Dependency là notifications
+    }, [searchTerm, setGlobalTaskSearch]);
 
     const unreadCount = notifications.filter(n => !n.read).length;
 
-    // XỬ LÝ KHI CLICK VÀO THÔNG BÁO (Sửa lỗi điều hướng)
-    const handleNotificationClick = async (n: any) => {
-        markNotificationRead(n.id);
-        setIsNotifOpen(false); // Đóng dropdown
+    const handleNotificationClick = (notif: any) => {
+        markNotificationRead(notif.id);
+        setIsNotifOpen(false);
 
-        try {
-            if (n.actionType === 'VIEW_PROJECT' && n.targetId) {
-                // Logic: Tìm project và load data, store sẽ tự chuyển view
-                await loadProjectData(n.targetId);
+        if (notif.actionType === 'VIEW_TASK' && notif.targetId) {
+            // We need to know which project the task belongs to. 
+            // If the task is in the store, we can find it.
+            const task = tasks.find(t => t.id === notif.targetId);
+            if (task) {
+                navigate(`/project/${task.projectId}/board?selectedIssue=${task.id}`);
+            } else {
+                // If not in store, we might need a better way to find the project ID
+                // For now, if we are in a project, we can try to stay there
+                navigate(`?selectedIssue=${notif.targetId}`);
             }
-            else if (n.actionType === 'VIEW_TASK' && n.targetId) {
-                // Logic: Mở modal task. 
-                // Lưu ý: Nếu task thuộc project khác chưa load, cần xử lý thêm logic load project trước.
-                // Ở đây ta giả định task đang nằm trong context hiện tại hoặc global search.
-                setSelectedTask(n.targetId);
-            }
-            else if (n.actionType === 'VIEW_COMMENT' && n.targetId) {
-                // Tìm task chứa comment này
-                const taskWithComment = tasks.find(t => t.comments.some(c => c.id === n.targetId));
-                if (taskWithComment) {
-                    setSelectedTask(taskWithComment.id);
-                } else {
-                    // Fallback: Nếu có targetId là taskId (thường backend gửi kèm)
-                    // Hoặc load lại project nếu cần
-                    console.warn("Task containing comment not found in current context");
-                }
-            }
-        } catch (error) {
-            console.error("Navigation error:", error);
+        } else if (notif.actionType === 'VIEW_PROJECT' && notif.targetId) {
+            navigate(`/project/${notif.targetId}`);
         }
     };
 
-    if (currentView === 'AUTH') {
-        return <Auth />;
-    }
+    const handleLogout = () => {
+        logout();
+        navigate('/auth');
+    };
 
     return (
         <div className={`flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300`}>
-
-            {/* Toast Notifications Area - Fixed Z-Index & Position */}
-            <div className="fixed top-20 right-6 z-[100] flex flex-col gap-3 max-w-sm pointer-events-none">
-                {toastNotifications.map(toast => (
-                    <div
-                        key={toast.id}
-                        className="pointer-events-auto animate-in slide-in-from-right-full duration-300 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-4 flex items-start gap-3 ring-1 ring-black/5"
-                    >
-                        <div className={`mt-0.5 flex-shrink-0 ${toast.type === 'SUCCESS' ? 'text-green-500' :
-                            toast.type === 'ERROR' ? 'text-red-500' :
-                                toast.type === 'WARNING' ? 'text-yellow-500' : 'text-blue-500'
-                            }`}>
-                            {toast.type === 'SUCCESS' && <CheckCircle2 size={20} />}
-                            {toast.type === 'ERROR' && <AlertCircle size={20} />}
-                            {toast.type === 'WARNING' && <AlertCircle size={20} />}
-                            {toast.type === 'INFO' && <Info size={20} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-tight">{toast.message}</p>
-                            {toast.targetName && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded inline-block">#{toast.targetName}</p>}
-                        </div>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
-                            }}
-                            className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                        >
-                            <X size={16} />
-                        </button>
-                    </div>
-                ))}
-            </div>
-
-            {/* Sidebar - Global */}
+            {/* Sidebar */}
             <aside className="w-16 sm:w-20 bg-[#0f172a] text-slate-400 flex flex-col items-center py-6 flex-shrink-0 z-30 shadow-xl">
                 <div
-                    onClick={goToWorkspace}
+                    onClick={() => navigate('/workspace')}
                     className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold mb-8 shadow-lg shadow-blue-900/50 cursor-pointer hover:bg-blue-500 transition-colors"
                 >
                     M
                 </div>
 
                 <nav className="flex flex-col gap-4 w-full">
-                    <SidebarItem icon={<Home size={20} />} active={currentView === 'WORKSPACE'} label="Workspace" onClick={goToWorkspace} />
-                    <SidebarItem icon={<Layout size={20} />} active={currentView === 'PROJECT'} label="Project" />
-                    <SidebarItem icon={<User size={20} />} active={currentView === 'PROFILE'} label="Profile" onClick={goToProfile} />
+                    <SidebarItem icon={<Home size={20} />} active={window.location.pathname === '/workspace'} label="Workspace" onClick={() => navigate('/workspace')} />
+                    <SidebarItem icon={<Layout size={20} />} active={window.location.pathname.startsWith('/project')} label="Project" />
+                    <SidebarItem icon={<User size={20} />} active={window.location.pathname === '/profile'} label="Profile" onClick={() => navigate('/profile')} />
                 </nav>
 
                 <div className="mt-auto flex flex-col items-center gap-6 pb-2">
                     <button onClick={toggleTheme} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-yellow-400">
                         {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
-                    <button onClick={logout} className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500 hover:text-white" title="Logout">
+                    <button onClick={handleLogout} className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500 hover:text-white" title="Logout">
                         <LogOut size={20} />
                     </button>
                 </div>
@@ -171,13 +86,10 @@ export default function App() {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 h-full relative">
-
                 {/* Top Header */}
                 <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 flex-shrink-0 z-20">
-
-                    {/* Search Bar */}
                     <div className="flex items-center gap-4 flex-1 max-w-xl">
-                        {currentView === 'PROJECT' && (
+                        {window.location.pathname.startsWith('/project') && (
                             <div className="relative w-full max-w-md hidden sm:block">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                 <input
@@ -193,7 +105,7 @@ export default function App() {
 
                     <div className="flex items-center gap-4">
                         <span className="font-semibold text-slate-700 dark:text-slate-200 hidden md:block text-sm">
-                            Welcome back, {currentUser?.name.split(' ')[0]}
+                            Welcome back, {currentUser?.name.split(' ')[0] || 'User'}
                         </span>
 
                         {/* Notification Bell */}
@@ -207,8 +119,6 @@ export default function App() {
                                     <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>
                                 )}
                             </button>
-
-                            {/* Notification Dropdown */}
                             {isNotifOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)}></div>
@@ -279,7 +189,6 @@ export default function App() {
                             <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700 hover:border-blue-500 transition-colors">
                                 <img src={currentUser?.avatar} alt="User" className="w-full h-full object-cover" />
                             </button>
-
                             {isProfileOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)}></div>
@@ -291,14 +200,14 @@ export default function App() {
                                                 <p className="text-xs text-slate-500 truncate">{currentUser?.email}</p>
                                             </div>
                                         </div>
-                                        <button onClick={() => { goToProfile(); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2 transition-colors">
+                                        <button onClick={() => { navigate('/profile'); setIsProfileOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2 transition-colors">
                                             <User size={16} /> Edit Profile
                                         </button>
                                         <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2 transition-colors">
                                             <Settings size={16} /> Preferences
                                         </button>
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-2"></div>
-                                        <button onClick={logout} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg flex items-center gap-2 transition-colors">
+                                        <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg flex items-center gap-2 transition-colors">
                                             <LogOut size={16} /> Sign Out
                                         </button>
                                     </div>
@@ -308,16 +217,14 @@ export default function App() {
                     </div>
                 </header>
 
-                {/* View Container */}
-                <div className="flex-1 overflow-hidden relative">
-                    {currentView === 'WORKSPACE' && <Workspace />}
-                    {currentView === 'PROJECT' && <ProjectView />}
-                    {currentView === 'PROFILE' && <Profile />}
-                </div>
+                {/* Page Content */}
+                <main className="flex-1 overflow-hidden relative">
+                    <Outlet />
+                </main>
             </div>
         </div>
     );
-}
+};
 
 const SidebarItem = ({ icon, active = false, label, onClick }: any) => (
     <button
@@ -329,7 +236,6 @@ const SidebarItem = ({ icon, active = false, label, onClick }: any) => (
             }`}
     >
         {icon}
-        {/* Tooltip on Hover */}
         <span className="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
             {label}
         </span>

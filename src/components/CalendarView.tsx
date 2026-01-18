@@ -1,10 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Task, TaskStatus } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-export const CalendarView: React.FC<{ onSelectTask: (taskId: string) => void }> = ({ onSelectTask }) => {
-    const { tasks } = useStore();
+export const CalendarView: React.FC = () => {
+    const { id: projectId } = useParams<{ id: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { tasks, loadProjectTasks, isProjectTasksLoaded } = useStore();
+
+    useEffect(() => {
+        if (projectId && !isProjectTasksLoaded) {
+            loadProjectTasks(projectId);
+        }
+    }, [projectId, loadProjectTasks, isProjectTasksLoaded]);
+
+    const handleTaskClick = (taskId: string) => {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set('selectedIssue', taskId);
+        setSearchParams(nextParams);
+    };
 
     const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -100,7 +115,7 @@ export const CalendarView: React.FC<{ onSelectTask: (taskId: string) => void }> 
                                     {getTasksForDay(day).map(task => (
                                         <div
                                             key={task.id}
-                                            onClick={() => onSelectTask(task.id)}
+                                            onClick={() => handleTaskClick(task.id)}
                                             className={`text-[10px] px-2 py-1.5 rounded-md truncate cursor-pointer transition-all border-l-2 shadow-sm hover:shadow-md hover:-translate-y-0.5
                                             ${task.status === TaskStatus.DONE
                                                     ? 'bg-green-50 text-green-700 border-green-500 dark:bg-green-900/20 dark:text-green-300'

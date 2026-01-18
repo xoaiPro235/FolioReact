@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
@@ -9,7 +10,14 @@ import { STATUS_CONFIG, StatusBadge, PriorityBadge } from './Shared'; // Đã th
 import { Activity, Calendar, Clock, AlertCircle } from 'lucide-react';
 
 export const Overview: React.FC = () => {
-  const { tasks, users, activities, setSelectedTask } = useStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { tasks, users, activities } = useStore();
+
+  const handleTaskClick = (taskId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('selectedIssue', taskId);
+    setSearchParams(nextParams);
+  };
 
   const allTasks = tasks;
 
@@ -133,9 +141,8 @@ export const Overview: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-6">Workload by Assignee</h3>
 
-          {/* Biểu đồ cột - Tắt focus outline */}
-          <div style={{ width: '100%', height: '300px', minWidth: 0, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full h-[300px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={workloadData} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
                 <XAxis type="number" hide />
@@ -174,7 +181,7 @@ export const Overview: React.FC = () => {
                 <div
                   key={act.id}
                   className={`flex gap-3 items-start p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${task ? 'cursor-pointer' : ''}`}
-                  onClick={() => task && setSelectedTask(task.id)}
+                  onClick={() => task && handleTaskClick(task.id)}
                 >
                   <img src={user?.avatar} className="w-8 h-8 rounded-full bg-slate-200" alt="" />
                   <div>
@@ -211,7 +218,7 @@ export const Overview: React.FC = () => {
             {upcomingTasks.length > 0 ? upcomingTasks.map(task => (
               <div
                 key={task.id}
-                onClick={() => setSelectedTask(task.id)}
+                onClick={() => handleTaskClick(task.id)}
                 className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg cursor-pointer hover:shadow-md transition-all group"
               >
                 <div className="flex items-center gap-3">
