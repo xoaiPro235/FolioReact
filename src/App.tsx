@@ -13,6 +13,15 @@ import { TaskListView } from './components/TaskListView';
 import { CalendarView } from './components/CalendarView';
 import { TeamView } from './components/TeamView';
 import { ActivityLogView } from './components/ActivityLogView';
+import IntroPage from './pages/IntroPage';
+
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+    const { currentUser, isInitialAuthChecked } = useStore();
+    if (isInitialAuthChecked && currentUser) {
+        return <Navigate to="/workspace" />;
+    }
+    return <>{children}</>;
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { currentUser, isLoading, isInitialAuthChecked, initializeAuth } = useStore();
@@ -32,7 +41,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (!currentUser) {
-        return <Navigate to="/auth" />;
+        return <Navigate to="/intro" />;
     }
 
     return <>{children}</>;
@@ -42,7 +51,8 @@ export default function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/intro" element={<PublicRoute><IntroPage /></PublicRoute>} />
+                <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
 
                 <Route path="/" element={
                     <ProtectedRoute>
