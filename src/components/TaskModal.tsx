@@ -21,6 +21,7 @@ export const TaskModal: React.FC = () => {
     users,
     currentUser,
     addComment,
+    deleteComment,
     currentProject,
     addAttachment,
     removeAttachment,
@@ -52,8 +53,9 @@ export const TaskModal: React.FC = () => {
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
-    type: 'TASK' | 'SUBTASK' | 'ATTACHMENT';
+    type: 'TASK' | 'SUBTASK' | 'ATTACHMENT' | 'COMMENT';
     id: string;
+    extraId?: string; // For taskId when deleting comment
   }>({ isOpen: false, type: 'TASK', id: '' });
 
   const [localTitle, setLocalTitle] = useState('');
@@ -144,6 +146,8 @@ export const TaskModal: React.FC = () => {
       deleteMutation.mutate(deleteConfirm.id);
     } else if (deleteConfirm.type === 'ATTACHMENT') {
       removeAttachment(task.id, deleteConfirm.id);
+    } else if (deleteConfirm.type === 'COMMENT') {
+      deleteComment(task.id, deleteConfirm.id);
     }
   };
 
@@ -169,54 +173,67 @@ export const TaskModal: React.FC = () => {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] border border-slate-200 dark:border-slate-800 z-10"
+        className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] sm:h-[85vh] md:h-[90vh] lg:h-[85vh] max-h-[100dvh] sm:max-h-[90vh] border border-slate-200 dark:border-slate-800 z-10"
       >
 
         {/* Header */}
-        <div className="flex flex-col gap-4 p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-col gap-3 p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20">
+          <div className="flex items-center gap-2 text-xs text-slate-500 overflow-x-auto no-scrollbar">
             {isSubtask && parentTask && (
-              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-900/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" onClick={() => navigateToTask(parentTask.id)}>
-                <CornerUpLeft className="w-3 h-3" />
-                <span className="font-medium">Belongs to: {parentTask.title}</span>
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-100 dark:border-blue-900/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors whitespace-nowrap" onClick={() => navigateToTask(parentTask.id)}>
+                <CornerUpLeft className="w-3.5 h-3.5" />
+                <span className="font-semibold">Parent: {parentTask.title}</span>
               </div>
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1">
               <StatusSelect value={task.status} onChange={handleStatusChange} readOnly={readOnly} large />
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <UserSelect
-                users={projectMembers}
-                selectedUserId={task.assigneeId}
-                onChange={handleAssigneeChange}
-                readOnly={readOnly}
-                className="w-full sm:w-64 h-10"
-              />
+            <div className="flex items-center gap-1 sm:gap-3">
+              <div className="hidden sm:block">
+                <UserSelect
+                  users={projectMembers}
+                  selectedUserId={task.assigneeId}
+                  onChange={handleAssigneeChange}
+                  readOnly={readOnly}
+                  className="w-48 md:w-64 h-10"
+                />
+              </div>
               {!readOnly && (
-                <button onClick={handleDeleteTaskClick} className="p-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full text-slate-400 hover:text-red-600 transition-colors" title="Delete Task">
+                <button onClick={handleDeleteTaskClick} className="p-2 sm:p-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full text-slate-400 hover:text-red-600 transition-colors" title="Delete Task">
                   <Trash2 className="w-5 h-5" />
                 </button>
               )}
-              <button onClick={handleClose} className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
+              <button onClick={handleClose} className="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
+
+          {/* Mobile Assignee Picker */}
+          <div className="sm:hidden w-full">
+            <UserSelect
+              users={projectMembers}
+              selectedUserId={task.assigneeId}
+              onChange={handleAssigneeChange}
+              readOnly={readOnly}
+              className="w-full h-11"
+            />
           </div>
         </div>
 
         <div className="flex flex-col md:flex-row h-full overflow-hidden">
           {/* Main Content */}
-          <div className="flex-1 p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+          <div className="flex-1 p-5 sm:p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
             <input
               readOnly={readOnly}
               value={localTitle}
               onChange={(e) => setLocalTitle(e.target.value)}
               onBlur={handleBlurTitle}
-              className="text-3xl font-bold text-slate-900 dark:text-white mb-6 bg-transparent border-none outline-none w-full placeholder:text-slate-300"
+              className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6 bg-transparent border-none outline-none w-full placeholder:text-slate-300"
               placeholder="Task Title"
             />
 
@@ -256,30 +273,34 @@ export const TaskModal: React.FC = () => {
                   {subtasks.map(st => (
                     <div
                       key={st.id}
-                      className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
+                      className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
                     >
-                      <div className="flex-shrink-0">
-                        <StatusSelect minimal value={st.status} onChange={(val) => updateMutation.mutate({ taskId: st.id, updates: { status: val } })} readOnly={readOnly} />
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex-shrink-0">
+                          <StatusSelect minimal value={st.status} onChange={(val) => updateMutation.mutate({ taskId: st.id, updates: { status: val } })} readOnly={readOnly} />
+                        </div>
+                        <span
+                          className={`flex-1 text-sm font-semibold truncate cursor-pointer hover:text-blue-600 ${st.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}
+                          onClick={() => navigateToTask(st.id)}
+                        >
+                          {st.title}
+                        </span>
                       </div>
-                      <span
-                        className={`flex-1 text-sm font-medium cursor-pointer hover:text-blue-600 ${st.status === TaskStatus.DONE ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}
-                        onClick={() => navigateToTask(st.id)}
-                      >
-                        {st.title}
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <PrioritySelect minimal value={st.priority} onChange={(val) => updateMutation.mutate({ taskId: st.id, updates: { priority: val } })} readOnly={readOnly} />
-                        <UserSelect
-                          users={projectMembers}
-                          selectedUserId={st.assigneeId}
-                          onChange={(uid) => updateMutation.mutate({ taskId: st.id, updates: { assigneeId: uid } })}
-                          readOnly={readOnly}
-                          className="w-32"
-                        />
+                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pl-8 sm:pl-0">
+                        <div className="flex items-center gap-2">
+                          <PrioritySelect minimal value={st.priority} onChange={(val) => updateMutation.mutate({ taskId: st.id, updates: { priority: val } })} readOnly={readOnly} />
+                          <UserSelect
+                            users={projectMembers}
+                            selectedUserId={st.assigneeId}
+                            onChange={(uid) => updateMutation.mutate({ taskId: st.id, updates: { assigneeId: uid } })}
+                            readOnly={readOnly}
+                            className="w-28 sm:w-32"
+                          />
+                        </div>
                         {!readOnly && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDeleteSubtaskClick(st.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 rounded transition-all"
+                            className="sm:opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 rounded transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -326,9 +347,20 @@ export const TaskModal: React.FC = () => {
                       <div key={c.id} className="flex gap-4 group">
                         <img src={u?.avatar} className="w-10 h-10 rounded-full ring-2 ring-white dark:ring-slate-900" alt="" />
                         <div className="flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{u?.name}</span>
-                            <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleString()}</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{u?.name}</span>
+                              <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleString()}</span>
+                            </div>
+                            {c.userId === currentUser?.id && (
+                              <button
+                                onClick={() => setDeleteConfirm({ isOpen: true, type: 'COMMENT', id: c.id })}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"
+                                title="Delete comment"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                           <div className="mt-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                             {c.content}
@@ -397,7 +429,7 @@ export const TaskModal: React.FC = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="w-full md:w-80 bg-slate-50 dark:bg-slate-900/50 border-l border-slate-100 dark:border-slate-800 p-8 space-y-8 overflow-y-auto">
+          <div className="w-full md:w-80 bg-slate-50 dark:bg-slate-900/50 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 p-6 sm:p-8 space-y-8 overflow-y-auto">
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Details</h4>
               <div className="space-y-6">
@@ -455,7 +487,12 @@ export const TaskModal: React.FC = () => {
         isOpen={deleteConfirm.isOpen}
         onClose={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}
         onConfirm={executeDelete}
-        title={deleteConfirm.type === 'TASK' ? 'Delete Task?' : deleteConfirm.type === 'SUBTASK' ? 'Delete Subtask?' : 'Remove File?'}
+        title={
+          deleteConfirm.type === 'TASK' ? 'Delete Task?' :
+            deleteConfirm.type === 'SUBTASK' ? 'Delete Subtask?' :
+              deleteConfirm.type === 'COMMENT' ? 'Delete Comment?' :
+                'Remove File?'
+        }
         description="Are you sure? This action cannot be undone."
         confirmText="Delete"
       />

@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment } from './services/api';
 import { supabase } from './supabaseClient';
 import { queryClient } from './queryClient';
 
@@ -62,6 +62,7 @@ interface AppState {
   removeAttachment: (taskId: string, fileId: string) => Promise<void>;
 
   addComment: (taskId: string, content: string) => Promise<void>;
+  deleteComment: (taskId: string, commentId: string) => Promise<void>;
 
   // Notifications
   addNotification: (msg: string, type?: AppNotification['type']) => void;
@@ -730,6 +731,26 @@ export const useStore = create<AppState>((set, get) => ({
 
       // Invalidate React Query cache to sync UI
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    }
+  },
+
+  deleteComment: async (taskId, commentId) => {
+    try {
+      await deleteComment(taskId, commentId);
+
+      set(state => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId
+            ? { ...t, comments: (t.comments || []).filter(c => c.id !== commentId) }
+            : t
+        )
+      }));
+
+      get().addNotification("Comment deleted", "INFO");
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error) {
+      console.error("Failed to delete comment", error);
+      get().addNotification("Failed to delete comment", "ERROR");
     }
   },
 

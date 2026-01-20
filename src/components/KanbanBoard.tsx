@@ -100,7 +100,7 @@ const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) =>
   const config = STATUS_CONFIG[status as TaskStatus];
 
   return (
-    <div className="flex flex-col h-full min-w-[350px] flex-1">
+    <div className="flex flex-col h-full min-w-[280px] sm:min-w-[350px] w-[85vw] sm:w-auto flex-shrink-0 sm:flex-1">
       <div className={`flex items-center justify-between mb-4 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl border-t-4 shadow-sm ${config.color.split(' ')[2]}`}>
         <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 text-base">
           {config.label}
@@ -108,7 +108,7 @@ const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) =>
         </h3>
       </div>
 
-      <div ref={setNodeRef} className="flex-1 bg-slate-100/50 dark:bg-slate-900/30 rounded-2xl p-3 space-y-3 overflow-y-auto border border-dashed border-slate-200 dark:border-slate-800 relative group/column">
+      <div ref={setNodeRef} className="flex-1 bg-slate-100/50 dark:bg-slate-900/30 rounded-2xl p-2 sm:p-3 space-y-3 overflow-y-auto border border-dashed border-slate-200 dark:border-slate-800 relative group/column">
         <SortableContext items={tasks.map((t: Task) => t.id)} strategy={verticalListSortingStrategy}>
           <AnimatePresence mode="popLayout">
             {tasks.map((task: Task) => (
@@ -126,7 +126,7 @@ const KanbanColumn = ({ status, tasks, onTaskClick, canEdit, onCreate }: any) =>
         {canEdit && (
           <button
             onClick={() => onCreate(status)}
-            className="w-full py-3 flex items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm transition-all text-sm font-bold mt-2 opacity-0 group-hover/column:opacity-100"
+            className="w-full py-3 flex items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm transition-all text-sm font-bold mt-2 sm:opacity-0 group-hover/column:opacity-100"
           >
             <Plus className="w-5 h-5" /> Create New Task
           </button>
@@ -213,16 +213,17 @@ export const KanbanBoard: React.FC = () => {
         onDragStart={(e) => canEdit && setActiveId(e.active.id as string)}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex h-full w-full gap-6 overflow-x-auto pb-4 px-2">
+        <div className="flex h-full w-full gap-4 sm:gap-6 overflow-x-auto pb-6 sm:pb-4 px-4 sm:px-2 snap-x snap-mandatory sm:snap-none no-scrollbar">
           {columns.map(status => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              tasks={rootTasks.filter(t => t.status === status)}
-              onTaskClick={handleTaskClick}
-              canEdit={canEdit}
-              onCreate={handleCreateClick}
-            />
+            <div key={status} className="snap-center">
+              <KanbanColumn
+                status={status}
+                tasks={rootTasks.filter(t => t.status === status)}
+                onTaskClick={handleTaskClick}
+                canEdit={canEdit}
+                onCreate={handleCreateClick}
+              />
+            </div>
           ))}
         </div>
         <DragOverlay zIndex={100}>

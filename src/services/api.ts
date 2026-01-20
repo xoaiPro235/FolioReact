@@ -215,6 +215,10 @@ export const createComment = async (taskId: string, content: string): Promise<Co
   return await axiosClient.post(`/task/${taskId}/comments`, { content });
 }
 
+export const deleteComment = async (taskId: string, commentId: string): Promise<void> => {
+  return await axiosClient.delete(`/task/${taskId}/comments/${commentId}`);
+}
+
 
 
 // --------SIGNALR / REALTIME------------

@@ -14,7 +14,8 @@ export const MainLayout: React.FC = () => {
         markNotificationRead,
         tasks,
         setGlobalTaskSearch,
-        globalTaskSearch
+        globalTaskSearch,
+        projects
     } = useStore();
 
     const navigate = useNavigate();
@@ -57,32 +58,54 @@ export const MainLayout: React.FC = () => {
         navigate('/auth');
     };
 
+    const handleProjectClick = () => {
+        const lastProjectId = localStorage.getItem('lastProjectId');
+        if (lastProjectId) {
+            navigate(`/project/${lastProjectId}`);
+        } else if (projects.length > 0) {
+            navigate(`/project/${projects[0].id}`);
+        } else {
+            // Optional: Show a notification or just stay on workspace
+            navigate('/workspace');
+        }
+    };
+
     return (
         <div className={`flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300`}>
-            {/* Sidebar */}
-            <aside className="w-16 sm:w-20 bg-[#0f172a] text-slate-400 flex flex-col items-center py-6 flex-shrink-0 z-30 shadow-xl">
+            {/* Sidebar - Hidden on mobile */}
+            <aside className="hidden sm:flex w-16 sm:w-20 bg-[#0f172a] text-slate-400 flex-col items-center py-6 flex-shrink-0 z-30 shadow-2xl border-r border-white/5">
                 <div
                     onClick={() => navigate('/workspace')}
-                    className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold mb-8 shadow-lg shadow-blue-900/50 cursor-pointer hover:bg-blue-500 transition-colors"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center text-white font-bold mb-8 shadow-lg shadow-blue-900/50 cursor-pointer hover:scale-105 active:scale-95 transition-all"
                 >
                     M
                 </div>
 
-                <nav className="flex flex-col gap-4 w-full">
-                    <SidebarItem icon={<Home size={20} />} active={window.location.pathname === '/workspace'} label="Workspace" onClick={() => navigate('/workspace')} />
-                    <SidebarItem icon={<Layout size={20} />} active={window.location.pathname.startsWith('/project')} label="Project" />
-                    <SidebarItem icon={<User size={20} />} active={window.location.pathname === '/profile'} label="Profile" onClick={() => navigate('/profile')} />
+                <nav className="flex flex-col gap-5 w-full">
+                    <SidebarItem icon={<Home size={22} />} active={window.location.pathname === '/workspace'} label="Workspace" onClick={() => navigate('/workspace')} />
+                    <SidebarItem icon={<Layout size={22} />} active={window.location.pathname.startsWith('/project')} label="Project" onClick={handleProjectClick} />
+                    <SidebarItem icon={<User size={22} />} active={window.location.pathname === '/profile'} label="Profile" onClick={() => navigate('/profile')} />
                 </nav>
 
                 <div className="mt-auto flex flex-col items-center gap-6 pb-2">
-                    <button onClick={toggleTheme} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-yellow-400">
+                    <button onClick={toggleTheme} className="p-2.5 hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-yellow-400 hover:rotate-12">
                         {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
-                    <button onClick={handleLogout} className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500 hover:text-white" title="Logout">
+                    <button onClick={handleLogout} className="p-2.5 hover:bg-red-500/10 rounded-xl transition-all text-slate-500 hover:text-red-500" title="Logout">
                         <LogOut size={20} />
                     </button>
                 </div>
             </aside>
+
+            {/* Mobile Bottom Navigation */}
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-4 z-40 pb-safe">
+                <MobileNavItem icon={<Home size={22} />} active={window.location.pathname === '/workspace'} onClick={() => navigate('/workspace')} />
+                <MobileNavItem icon={<Layout size={22} />} active={window.location.pathname.startsWith('/project')} onClick={handleProjectClick} />
+                <MobileNavItem icon={<User size={22} />} active={window.location.pathname === '/profile'} onClick={() => navigate('/profile')} />
+                <button onClick={toggleTheme} className="p-2 text-slate-500">
+                    {theme === 'dark' ? <Sun size={22} /> : <Moon size={22} />}
+                </button>
+            </div>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 h-full relative">
@@ -218,7 +241,7 @@ export const MainLayout: React.FC = () => {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 overflow-hidden relative">
+                <main className="flex-1 overflow-hidden relative mb-16 sm:mb-0">
                     <Outlet />
                 </main>
             </div>
@@ -231,13 +254,23 @@ const SidebarItem = ({ icon, active = false, label, onClick }: any) => (
         onClick={onClick}
         className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all mx-auto relative group
       ${active
-                ? 'bg-blue-600/10 text-blue-500 after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-1 after:h-8 after:bg-blue-500 after:rounded-l-full'
-                : 'hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600/20 text-blue-400 shadow-inner'
+                : 'hover:bg-slate-800 hover:text-white text-slate-500'
             }`}
     >
+        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-500 rounded-r-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>}
         {icon}
-        <span className="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+        <span className="absolute left-full ml-4 px-2.5 py-1.5 bg-slate-800 text-white text-[11px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-x-1 group-hover:translate-x-0 whitespace-nowrap z-50 pointer-events-none shadow-xl border border-white/5">
             {label}
         </span>
+    </button>
+);
+
+const MobileNavItem = ({ icon, active = false, onClick }: any) => (
+    <button
+        onClick={onClick}
+        className={`p-3 rounded-xl transition-all ${active ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-110' : 'text-slate-400 dark:text-slate-500'}`}
+    >
+        {icon}
     </button>
 );
