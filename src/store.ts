@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser } from './services/api';
 import { supabase } from './supabaseClient';
 import { queryClient } from './queryClient';
 
@@ -34,7 +34,7 @@ interface AppState {
   login: (email: string, password: string) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
-  updateProfile: (data: Partial<User>) => void;
+  updateProfile: (data: { name?: string, avatarUrl?: string, bio?: string }) => Promise<void>;
   deleteAccount: () => void;
 
   goToWorkspace: () => void;
@@ -126,6 +126,7 @@ export const useStore = create<AppState>((set, get) => ({
           email: data.session.user.email!,
           name: profile?.name ?? data.session.user.user_metadata?.full_name ?? data.session.user.email!.split("@")[0],
           avatar: profile?.avatar_url ?? data.session.user.user_metadata?.avatar_url ?? "",
+          bio: profile?.bio ?? "",
           isOnline: true,
         };
 
@@ -187,9 +188,6 @@ export const useStore = create<AppState>((set, get) => ({
       get().addNotification(`Account created successfully!`, 'SUCCESS');
 
       // 3. Tự động đăng nhập luôn
-      // Không set isLoading: false ở đây. 
-      // Hãy để hàm login tự lo liệu việc đó. Nếu set false ở đây màn hình sẽ bị nháy.
-
       try {
         await get().login(data.email, data.password);
       } catch (loginError) {
@@ -212,18 +210,44 @@ export const useStore = create<AppState>((set, get) => ({
     set({ currentUser: null, currentProject: null, selectedTaskId: null, tasks: [], activities: [] });
   },
 
-  updateProfile: (data) => {
-    // TODO: API Call - [PATCH] /api/users/me
-    set(state => ({
-      currentUser: state.currentUser ? { ...state.currentUser, ...data } : null
-    }));
-    get().addNotification("Profile updated successfully", "SUCCESS");
+  updateProfile: async (data) => {
+    set({ isLoading: true });
+    try {
+      const updatedUser = await updateProfile(data);
+      set({
+        currentUser: updatedUser,
+        isLoading: false
+      });
+      get().addNotification("Profile updated successfully", "SUCCESS");
+    } catch (error) {
+      set({ isLoading: false });
+      get().addNotification("Failed to update profile", "ERROR");
+      throw error;
+    }
   },
 
-  deleteAccount: () => {
-    // TODO: API Call - [DELETE] /api/users/me
-    set({ currentUser: null });
-    alert("Account deleted.");
+  deleteAccount: async () => {
+    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) return;
+
+    set({ isLoading: true });
+    try {
+      await removeUser();
+      localStorage.removeItem('lastView');
+      localStorage.removeItem('lastProjectId');
+      set({
+        currentUser: null,
+        currentProject: null,
+        selectedTaskId: null,
+        tasks: [],
+        activities: [],
+        isLoading: false
+      });
+      get().addNotification("Account deleted successfully", "INFO");
+    } catch (error) {
+      set({ isLoading: false });
+      get().addNotification("Failed to delete account", "ERROR");
+      throw error;
+    }
   },
 
   toggleTheme: () => {

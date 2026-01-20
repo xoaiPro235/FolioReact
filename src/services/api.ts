@@ -90,6 +90,18 @@ export const searchUsers = async (query: string): Promise<User[]> => {
   return await axiosClient.get(`/users/search?q=${encodeURIComponent(query)}`);
 };
 
+export const updateProfile = async (data: { name?: string, avatarUrl?: string, bio?: string }): Promise<User> => {
+  const response: any = await axiosClient.patch('/users/me', data);
+  return {
+    ...response,
+    avatar: response.avatarUrl || response.avatar_url || response.avatar
+  };
+};
+
+export const removeUser = async (): Promise<void> => {
+  return await axiosClient.delete(`/users/me`);
+}
+
 // --------PROJECT------------
 export const fetchProjects = async (userId: string): Promise<Project[]> => {
   // TODO: API INTEGRATION [GET] /api/users/{userId}/projects

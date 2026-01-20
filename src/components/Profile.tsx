@@ -17,7 +17,7 @@ export const Profile: React.FC = () => {
     if (!currentUser) return null;
 
     const handleSave = () => {
-        updateProfile({ name, bio, avatar });
+        updateProfile({ name, bio, avatarUrl: avatar });
     };
 
     const handleDelete = () => {
