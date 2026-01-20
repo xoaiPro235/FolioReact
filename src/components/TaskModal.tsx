@@ -308,7 +308,7 @@ export const TaskModal: React.FC = () => {
                   onClick={() => setActiveTab('comments')}
                   className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}
                 >
-                  <MessageSquare className="w-4 h-4" /> Comments ({task.comments.length})
+                  <MessageSquare className="w-4 h-4" /> Comments ({task.comments?.length || 0})
                 </button>
                 <button
                   onClick={() => setActiveTab('activity')}
@@ -320,7 +320,7 @@ export const TaskModal: React.FC = () => {
 
               {activeTab === 'comments' && (
                 <div className="space-y-6 mb-6">
-                  {task.comments.length > 0 ? [...task.comments].reverse().map(c => {
+                  {(task.comments?.length || 0) > 0 ? [...(task.comments || [])].reverse().map(c => {
                     const u = getUser(c.userId);
                     return (
                       <div key={c.id} className="flex gap-4 group">

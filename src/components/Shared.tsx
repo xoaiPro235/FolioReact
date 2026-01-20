@@ -49,6 +49,15 @@ export const PRIORITY_CONFIG = {
 // REUSABLE COMPONENTS
 // ==========================================
 
+const formatFileSize = (bytes: number | string) => {
+    const b = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
+    if (isNaN(b) || b <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(b) / Math.log(k));
+    return parseFloat((b / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 interface SelectProps {
     value: string;
     onChange: (val: any) => void;
@@ -218,13 +227,17 @@ export const AttachmentList: React.FC<{ files?: FileAttachment[], onUpload?: (fi
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {files.map((file) => (
-                    <div key={file.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg group hover:border-blue-400 dark:hover:border-blue-600 transition-colors cursor-pointer">
+                    <div
+                        key={file.id}
+                        onClick={() => window.open(file.url, '_blank')}
+                        className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg group hover:border-blue-400 dark:hover:border-blue-600 transition-colors cursor-pointer"
+                    >
                         <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded flex items-center justify-center text-slate-500 dark:text-slate-400">
                             <FileText className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
-                            <p className="text-xs text-slate-400">{file.size} • {file.type}</p>
+                            <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
                         </div>
                         {onDelete && (
                             <button

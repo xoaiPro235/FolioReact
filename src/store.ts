@@ -1,8 +1,9 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile } from './services/api';
 import { supabase } from './supabaseClient';
+import { queryClient } from './queryClient';
 
 interface AppState {
   // Global State
@@ -58,9 +59,9 @@ interface AppState {
   patchTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   addAttachment: (taskId: string, file: File) => Promise<void>;
-  removeAttachment: (taskId: string, fileId: string) => void;
+  removeAttachment: (taskId: string, fileId: string) => Promise<void>;
 
-  addComment: (taskId: string, content: string) => void;
+  addComment: (taskId: string, content: string) => Promise<void>;
 
   // Notifications
   addNotification: (msg: string, type?: AppNotification['type']) => void;
@@ -657,7 +658,6 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addAttachment: async (taskId, file) => {
-    // TODO: API Call - [POST] /api/tasks/{id}/attachments
     const uploadedFile = await uploadFile(taskId, file);
 
     set(state => ({
@@ -666,11 +666,19 @@ export const useStore = create<AppState>((set, get) => ({
       )
     }));
 
+    // Invalidate React Query cache to sync UI
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+
     get().addNotification("File uploaded", "SUCCESS");
   },
 
-  removeAttachment: (taskId, fileId) => {
-    // TODO: API Call - [DELETE] /api/tasks/{id}/attachments/{fileId}
+  removeAttachment: async (taskId, fileId) => {
+    try {
+      await deleteFile(taskId, fileId);
+    } catch (error) {
+      get().addNotification("Xóa file thất bại", "ERROR");
+      return;
+    }
     set(state => ({
       tasks: state.tasks.map(t => {
         if (t.id !== taskId) return t;
@@ -679,23 +687,25 @@ export const useStore = create<AppState>((set, get) => ({
         return { ...t, files: currentFiles.filter(f => f.id !== fileId) };
       })
     }));
+    // Invalidate React Query cache to sync UI
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+
     get().addNotification("File removed", "INFO");
   },
 
 
 
-  addComment: (taskId, content) => {
+  addComment: async (taskId, content) => {
     const { currentUser } = get();
     if (!currentUser) return;
 
-    // TODO: API Call - [POST] /api/tasks/{id}/comments
-    // TODO: SignalR - hubConnection.invoke("AddComment", taskId, content);
-    const newComment: Comment = {
-      id: `c${Date.now()}`,
-      userId: currentUser.id,
-      content,
-      createdAt: new Date().toISOString()
-    };
+    let newComment: any;
+    try {
+      newComment = await createComment(taskId, content);
+    } catch (error) {
+      get().addNotification("Thêm bình luận thất bại", "ERROR");
+      return;
+    }
 
     set(state => ({
       tasks: state.tasks.map(t =>
@@ -717,6 +727,9 @@ export const useStore = create<AppState>((set, get) => ({
         targetId: taskId,
         targetName: task.title
       });
+
+      // Invalidate React Query cache to sync UI
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     }
   },
 
