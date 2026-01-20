@@ -39,6 +39,17 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
     }
   }, [selectedIssue, selectedTaskId, setSelectedTask]);
 
+  const currentTab = useMemo(() => {
+    const path = location.pathname;
+    if (path.includes('/overview')) return 'overview';
+    if (path.includes('/board')) return 'kanban';
+    if (path.includes('/list')) return 'list';
+    if (path.includes('/calendar')) return 'calendar';
+    if (path.includes('/team')) return 'team';
+    if (path.includes('/activity')) return 'activity';
+    return 'kanban';
+  }, [location.pathname]);
+
   if (!currentProject) return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-8 space-y-6">
       <div className="flex justify-between items-center">
@@ -58,16 +69,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
     .map(m => users.find(u => u.id === m.userId))
     .filter((u): u is typeof u => !!u && u.isOnline === true);
 
-  const currentTab = useMemo(() => {
-    const path = location.pathname;
-    if (path.includes('/overview')) return 'overview';
-    if (path.includes('/board')) return 'kanban';
-    if (path.includes('/list')) return 'list';
-    if (path.includes('/calendar')) return 'calendar';
-    if (path.includes('/team')) return 'team';
-    if (path.includes('/activity')) return 'activity';
-    return 'kanban';
-  }, [location.pathname]);
 
   const handleTabChange = (tab: TabType) => {
     const pathMap: Record<TabType, string> = {
