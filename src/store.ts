@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser, fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './services/api';
 import { supabase } from './supabaseClient';
 import { queryClient } from './queryClient';
 
@@ -66,9 +66,13 @@ interface AppState {
 
   // Notifications
   addNotification: (msg: string, type?: AppNotification['type']) => void;
-  addDetailedNotification: (notification: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => void;
+  addDetailedNotification: (notification: Partial<AppNotification> & { message: string }) => void;
+  loadNotifications: () => Promise<void>;
   markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
   dismissNotification: (id: string) => void;
+
+  handleSignalRUpdate: (type: string, payload: any) => void;
 
   // Team
   changeMemberRole: (userId: string, newRole: Role) => void;
@@ -141,6 +145,12 @@ export const useStore = create<AppState>((set, get) => ({
           await get().loadWorkspaceData(data.session.user.id);
           // Restore to previous project
           await get().loadProjectData(lastProjectId);
+
+          // Connect SignalR for real-time notifications - MOVED to loadProjectInitial
+          const user = get().currentUser;
+          if (user) {
+            await get().loadNotifications();
+          }
         } else if (lastView === 'PROFILE') {
           await get().loadWorkspaceData(data.session.user.id);
           get().goToProfile();
@@ -168,6 +178,16 @@ export const useStore = create<AppState>((set, get) => ({
 
       // 2. Lưu currentUser vào Store ngay lập tức
       set({ currentUser: user, isLoading: false });
+
+      // 3. Connect SignalR if there was a last project
+      const lastProjectId = localStorage.getItem('lastProjectId');
+      if (lastProjectId && user) {
+        const { signalRService } = await import('./services/api');
+        await signalRService.connect(lastProjectId, user.name, user.avatar, (type, payload) => {
+          get().handleSignalRUpdate(type, payload);
+        });
+        await get().loadNotifications();
+      }
       // Navigation will be handled by App.tsx because currentUser is now set
 
     } catch (e) {
@@ -204,9 +224,11 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  logout: () => {
+  logout: async () => {
     localStorage.removeItem('lastView');
     localStorage.removeItem('lastProjectId');
+    const { signalRService } = await import('./services/api');
+    await signalRService.disconnect();
     set({ currentUser: null, currentProject: null, selectedTaskId: null, tasks: [], activities: [] });
   },
 
@@ -492,6 +514,15 @@ export const useStore = create<AppState>((set, get) => ({
         isProjectTasksLoaded: false, // Reset tasks loaded flag for new project
         isLoading: false
       });
+
+      // Reconnect SignalR for the new project
+      const { signalRService } = await import('./services/api');
+      const user = get().currentUser;
+      if (user) {
+        await signalRService.connect(projectId, user.name, user.avatar, (type, payload) => {
+          get().handleSignalRUpdate(type, payload);
+        });
+      }
     } catch (error) {
       console.error("Failed to load project initial data", error);
       set({ isLoading: false });
@@ -541,26 +572,8 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const responseTask = await createTask(task);
 
-      // Activity Log logic
-      const { currentUser } = get();
-      let newActivities = get().activities;
-
-      if (currentUser) {
-        const actionText = task.parentTaskId ? 'created subtask' : 'created task';
-        const log: ActivityLog = {
-          id: `act-${Date.now()}`,
-          userId: currentUser.id,
-          action: actionText,
-          target: task.title,
-          taskId: responseTask.id, // Dùng ID thật từ server trả về
-          createdAt: new Date().toISOString()
-        };
-        newActivities = [log, ...newActivities];
-      }
-
       set((state) => ({
         tasks: [...state.tasks, responseTask],
-        activities: newActivities,
         isLoading: false
       }));
 
@@ -597,35 +610,6 @@ export const useStore = create<AppState>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
       }));
-
-      // 4. LOGGING (Logic của bạn viết đoạn này rất tốt, giữ nguyên)
-      if (currentUser) {
-        const key = Object.keys(updates)[0];
-        let actionText = `updated ${key} on`;
-
-        switch (key) {
-          case 'status': actionText = `updated status to ${updates.status}`; break;
-          case 'priority': actionText = `updated priority to ${updates.priority}`; break;
-          case 'assigneeId':
-            const newAssignee = users.find(u => u.id === updates.assigneeId);
-            actionText = newAssignee ? `assigned to ${newAssignee.name}` : `removed assignee from`;
-            break;
-          case 'startDate': actionText = `set start date to ${updates.startDate}`; break;
-          case 'dueDate': actionText = `set due date to ${updates.dueDate}`; break;
-          case 'title': actionText = `renamed task`; break;
-          case 'description': actionText = `updated description of`; break;
-        }
-
-        const log: ActivityLog = {
-          id: `act-${Date.now()}`,
-          userId: currentUser.id,
-          action: actionText,
-          target: task.title,
-          taskId: task.id,
-          createdAt: new Date().toISOString()
-        };
-        set(state => ({ activities: [log, ...state.activities] }));
-      }
     } catch (error) {
       get().addNotification("Cập nhật task thất bại", "ERROR");
     }
@@ -654,24 +638,9 @@ export const useStore = create<AppState>((set, get) => ({
           nextSelectedId = null;
         }
 
-        // Logic Log
-        let newActivities = state.activities;
-        if (state.currentUser) {
-          const log: ActivityLog = {
-            id: `act-${Date.now()}`,
-            userId: state.currentUser.id,
-            action: 'deleted task',
-            target: targetTask.title,
-            taskId: targetTask.id,
-            createdAt: new Date().toISOString()
-          };
-          newActivities = [log, ...state.activities];
-        }
-
         return {
           tasks: updatedTasks,
-          selectedTaskId: nextSelectedId,
-          activities: newActivities
+          selectedTaskId: nextSelectedId
         };
       });
 
@@ -738,19 +707,14 @@ export const useStore = create<AppState>((set, get) => ({
       )
     }));
 
-    // Log Comment Activity
+    // Send detailed notification about new comment
     const task = get().tasks.find(t => t.id === taskId);
     if (task) {
-      const log: ActivityLog = { id: `act-${Date.now()}`, userId: currentUser.id, action: 'commented on', target: task.title, taskId: task.id, createdAt: new Date().toISOString() };
-      set(state => ({ activities: [log, ...state.activities] }));
-
-      // Send detailed notification about new comment
       get().addDetailedNotification({
         message: `${currentUser.name} added a comment to "${task.title}"`,
+        title: 'New Comment',
         type: 'INFO',
-        actionType: 'VIEW_TASK',
-        targetId: taskId,
-        targetName: task.title
+        link: `/project/${task.projectId}/board?selectedIssue=${taskId}`
       });
 
       // Invalidate React Query cache to sync UI
@@ -780,34 +744,86 @@ export const useStore = create<AppState>((set, get) => ({
 
   addNotification: (msg, type: AppNotification['type'] = 'INFO') => {
     const newNotif: AppNotification = {
-      id: `n${Date.now()}`,
+      id: `toast-${Date.now()}`,
       message: msg,
-      read: false,
-      type,
+      read: true,
+      type: type,
       createdAt: new Date().toISOString(),
-      actionType: 'NONE'
+      title: type === 'ERROR' ? 'Error' : type === 'SUCCESS' ? 'Success' : 'Info'
     };
     set(state => ({ notifications: [newNotif, ...state.notifications] }));
   },
 
   addDetailedNotification: (notif) => {
+    const allowedTitles = ["New Task Assigned", "New Comment", "Task Overdue", "Task Due Soon"];
+    if (notif.title && !allowedTitles.includes(notif.title)) {
+      console.log("Notification filtered out:", notif.title);
+      return;
+    }
+
     const newNotif: AppNotification = {
-      id: `n${Date.now()}`,
+      // Use the provided ID (from DB) or generate a local temporary one
+      id: notif.id || `n${Date.now()}`,
       message: notif.message,
       read: false,
       type: notif.type || 'INFO',
-      createdAt: new Date().toISOString(),
-      actionType: notif.actionType || 'NONE',
-      targetId: notif.targetId,
-      targetName: notif.targetName
+      createdAt: notif.createdAt || new Date().toISOString(),
+      link: notif.link,
+      title: notif.title
     };
-    set(state => ({ notifications: [newNotif, ...state.notifications] }));
+    set(state => {
+      // Prevent duplicate notifications if the same ID already exists
+      if (state.notifications.some(n => n.id === newNotif.id)) {
+        return state;
+      }
+      return { notifications: [newNotif, ...state.notifications] };
+    });
   },
 
-  markNotificationRead: (id) => {
+  loadNotifications: async () => {
+    try {
+      const data = await fetchNotifications();
+      const mapped: AppNotification[] = data.map((n: any) => ({
+        id: n.id,
+        message: n.message,
+        read: n.isRead,
+        type: n.type,
+        createdAt: n.createdAt,
+        link: n.link,
+        title: n.title
+      }));
+      set({ notifications: mapped });
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    }
+  },
+
+  markNotificationRead: async (id) => {
     set(state => ({
       notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
     }));
+
+    // If the ID is a local temporary one (starts with 'n'), don't call the backend
+    if (id.startsWith('n')) {
+      return;
+    }
+
+    try {
+      await markNotificationAsRead(id);
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+    }
+  },
+
+  markAllNotificationsRead: async () => {
+    set(state => ({
+      notifications: state.notifications.map(n => ({ ...n, read: true }))
+    }));
+    try {
+      await markAllNotificationsAsRead();
+    } catch (error) {
+      console.error("Failed to mark all as read:", error);
+    }
   },
 
   dismissNotification: (id) => {
@@ -816,22 +832,133 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
+  handleSignalRUpdate: (type, payload) => {
+    console.log(`[SignalR] Handling update: ${type}`, payload);
+
+    const projectId = get().currentProject?.id;
+
+    switch (type) {
+      case 'ReceiveNotification':
+        get().addDetailedNotification(payload);
+        break;
+
+      case 'TaskUpdated':
+        console.log('[SignalR] TaskUpdated:', payload);
+        const taskUpdates: any = {};
+        Object.keys(payload).forEach(key => {
+          if (payload[key] !== null) {
+            taskUpdates[key] = payload[key];
+          }
+        });
+
+        // 1. Update Zustand State
+        set(state => ({
+          tasks: state.tasks.map(t => t.id === payload.id ? { ...t, ...taskUpdates } : t)
+        }));
+
+        // 2. Update React Query Cache for IMMEDIATE UI update
+        const targetProjectId = payload.projectId || projectId;
+        if (targetProjectId) {
+          queryClient.setQueryData(['tasks', targetProjectId], (old: Task[] | undefined) => {
+            if (!old) return old;
+            return old.map(t => t.id === payload.id ? { ...t, ...taskUpdates } : t);
+          });
+          queryClient.invalidateQueries({ queryKey: ['tasks', targetProjectId] });
+        }
+        break;
+
+      case 'TaskCreated':
+        console.log('[SignalR] TaskCreated:', payload);
+        if (get().currentProject?.id === payload.projectId) {
+          // 1. Update Zustand State
+          const exists = get().tasks.some(t => t.id === payload.id);
+          if (!exists) {
+            set(state => ({ tasks: [payload as Task, ...state.tasks] }));
+          }
+
+          // 2. Update React Query Cache
+          queryClient.setQueryData(['tasks', payload.projectId], (old: Task[] | undefined) => {
+            if (!old) return [payload];
+            if (old.some(t => t.id === payload.id)) return old;
+            return [payload as Task, ...old];
+          });
+          queryClient.invalidateQueries({ queryKey: ['tasks', payload.projectId] });
+        }
+        break;
+
+      case 'CommentAdded':
+        console.log('[SignalR] CommentAdded:', payload);
+        // 1. Update Zustand State
+        set(state => ({
+          tasks: state.tasks.map(t =>
+            t.id === payload.taskId
+              ? { ...t, comments: [...(t.comments || []), payload] }
+              : t
+          )
+        }));
+
+        // 2. Update React Query Cache
+        if (projectId) {
+          queryClient.setQueryData(['tasks', projectId], (old: Task[] | undefined) => {
+            if (!old) return old;
+            return old.map(t =>
+              t.id === payload.taskId
+                ? { ...t, comments: [...(t.comments || []), payload] }
+                : t
+            );
+          });
+          queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+        }
+        break;
+
+      case 'CommentDeleted':
+        console.log('[SignalR] CommentDeleted:', payload);
+        // 1. Update Zustand State
+        set(state => ({
+          tasks: state.tasks.map(t =>
+            t.id === payload.taskId
+              ? { ...t, comments: (t.comments || []).filter((c: any) => c.id !== payload.commentId) }
+              : t
+          )
+        }));
+
+        // 2. Update React Query Cache
+        if (projectId) {
+          queryClient.setQueryData(['tasks', projectId], (old: Task[] | undefined) => {
+            if (!old) return old;
+            return old.map(t =>
+              t.id === payload.taskId
+                ? { ...t, comments: (t.comments || []).filter((c: any) => c.id !== payload.commentId) }
+                : t
+            );
+          });
+          queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+        }
+        break;
+
+      case 'ActivityLogAdded':
+        console.log('[SignalR] ActivityLogAdded:', payload);
+        const normalizedActivity = {
+          ...payload,
+          userId: payload.userId || (payload as any).UserId,
+          taskId: payload.taskId || (payload as any).TaskId,
+          projectId: payload.projectId || (payload as any).ProjectId,
+          action: payload.action || (payload as any).Action,
+          target: payload.target || (payload as any).Target,
+          createdAt: payload.createdAt || (payload as any).CreatedAt,
+        };
+        set(state => ({
+          activities: [normalizedActivity as ActivityLog, ...state.activities]
+        }));
+        break;
+    }
+  },
+
   changeMemberRole: async (userId, newRole) => {
     const { currentProject, users } = get();
     if (!currentProject) return;
-
-    // Kiểm tra member tồn tại
-    const memberExists = currentProject.members.some(m => m.userId === userId);
-    if (!memberExists) {
-      get().addNotification("Member not found in project", "WARNING");
-      return;
-    }
-
     try {
-      // Call API
       await updateProjectMemberRole(currentProject.id, userId, newRole);
-
-      // Update state
       set((state) => {
         if (!state.currentProject) return {};
         const updatedMembers = state.currentProject.members.map(m =>
@@ -841,12 +968,8 @@ export const useStore = create<AppState>((set, get) => ({
           currentProject: { ...state.currentProject, members: updatedMembers }
         };
       });
-
-      // Success notification
-      const user = users.find(u => u.id === userId);
-      const memberName = user?.name || 'User';
+      const memberName = users.find(u => u.id === userId)?.name || 'User';
       get().addNotification(`Updated ${memberName}'s role to ${newRole}`, "SUCCESS");
-
     } catch (error) {
       console.error("Failed to update member role", error);
       get().addNotification("Failed to update member role", "ERROR");
@@ -856,41 +979,23 @@ export const useStore = create<AppState>((set, get) => ({
   inviteUserToProject: async (user, role) => {
     const { currentProject } = get();
     if (!currentProject) return;
-
     try {
       const response = await addProjectMember(currentProject.id, user.id, role);
-
-      if (!response) {
-        throw new Error("API response is undefined");
-      }
-
+      if (!response) throw new Error("API response is undefined");
       const newMember: ProjectMember = {
         userId: response.userId,
         role: response.role
       };
-
       set((state) => {
         if (!state.currentProject) return {};
         if (state.currentProject.members.some(m => m.userId === user.id)) return {};
-
-        // Check if user already in users list
         const userExists = state.users.some(u => u.id === user.id);
-
         return {
           currentProject: { ...state.currentProject, members: [...state.currentProject.members, newMember] },
-          // Add user to users list nếu chưa có
           users: userExists ? state.users : [...state.users, user]
         };
       });
-
-      get().addDetailedNotification({
-        message: `Invited ${user.name} as ${role} to "${currentProject?.name}"`,
-        type: 'SUCCESS',
-        actionType: 'VIEW_PROJECT',
-        targetId: currentProject?.id,
-        targetName: currentProject?.name
-      });
-
+      get().addNotification(`Invited ${user.name} to project`, 'SUCCESS');
     } catch (error) {
       console.error("Failed to invite member", error);
       get().addNotification("Failed to invite member", "ERROR");
@@ -900,25 +1005,18 @@ export const useStore = create<AppState>((set, get) => ({
   removeMemberFromProject: async (userId) => {
     const { currentUser, currentProject } = get();
     if (!currentProject || !currentUser) return;
-
     if (currentProject.ownerId !== currentUser.id) {
       get().addNotification("Only project owner can remove members", "WARNING");
       return;
     }
-
     if (userId === currentProject.ownerId) {
       get().addNotification("Cannot remove project owner", "WARNING");
       return;
     }
-
-    const user = get().users.find(u => u.id === userId);
-
     try {
       await removeProjectMember(currentProject.id, userId);
-
       set((state) => {
         if (!state.currentProject) return {};
-
         return {
           currentProject: {
             ...state.currentProject,
@@ -929,19 +1027,9 @@ export const useStore = create<AppState>((set, get) => ({
           )
         };
       });
-
-      if (user) {
-        get().addDetailedNotification({
-          message: `Removed ${user.name} from "${currentProject.name}"`,
-          type: 'SUCCESS',
-          actionType: 'VIEW_PROJECT',
-          targetId: currentProject.id,
-          targetName: currentProject.name
-        });
-      }
-
-    } catch (err) {
-      console.error("Failed to remove member", err);
+      get().addNotification("Member removed from project", "SUCCESS");
+    } catch (error) {
+      console.error("Failed to remove member", error);
       get().addNotification("Failed to remove member", "ERROR");
     }
   },
@@ -950,6 +1038,6 @@ export const useStore = create<AppState>((set, get) => ({
     const { currentProject, currentUser } = get();
     if (!currentProject || !currentUser) return null;
     const member = currentProject.members.find(m => m.userId === currentUser.id);
-    return member ? member.role : null;
+    return member ? (member.role as Role) : null;
   }
 }));

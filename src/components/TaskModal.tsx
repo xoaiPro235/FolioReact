@@ -393,23 +393,50 @@ export const TaskModal: React.FC = () => {
               {activeTab === 'activity' && (
                 <div className="space-y-6 mb-6">
                   {isLoadingLogs ? (
-                    <div className="flex items-center justify-center py-8 text-slate-400">Loading history...</div>
+                    <div className="flex items-center justify-center py-12 text-slate-400">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-sm font-medium">Loading history...</p>
+                      </div>
+                    </div>
                   ) : taskLogs.length > 0 ? (
-                    <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-4 space-y-6 py-2">
+                    <div className="relative border-l-2 border-slate-100 dark:border-slate-800 ml-4 space-y-8 py-4">
                       {taskLogs.map(log => {
-                        const u = getUser(log.userId);
+                        const uId = log.userId || (log as any).UserId;
+                        const u = getUser(uId);
+                        const lowerAction = log.action.toLowerCase();
+                        const isStatusUpdate = lowerAction.includes('status to');
+                        const statusFromAction = isStatusUpdate ? (log.action.split(/to /i)[1] || '').trim().toUpperCase() : '';
+
+                        const isPriorityUpdate = lowerAction.includes('priority to');
+                        const priorityFromAction = isPriorityUpdate ? (log.action.split(/to /i)[1] || '').trim().toUpperCase() : '';
+
                         return (
-                          <div key={log.id} className="relative pl-6">
-                            <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600"></div>
-                            <div className="flex flex-col gap-1">
-                              <div className="text-sm text-slate-700 dark:text-slate-300">
-                                <span className="font-bold text-slate-900 dark:text-white mr-1">{u?.name || 'Unknown'}</span>
-                                {log.action} <span
-                                  className="font-medium cursor-pointer hover:text-blue-500 hover:underline"
+                          <div key={log.id} className="relative pl-8">
+                            <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 ring-4 ring-white dark:ring-slate-900"></div>
+                            <div className="flex flex-col gap-1.5">
+                              <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                                <span className="font-bold text-slate-900 dark:text-white mr-1.5">{u?.name || 'Unknown'}</span>
+                                {isStatusUpdate && statusFromAction ? (
+                                  <>
+                                    {log.action.split(/to /i)[0]} to <StatusBadge status={statusFromAction} />
+                                  </>
+                                ) : isPriorityUpdate && priorityFromAction ? (
+                                  <>
+                                    {log.action.split(/to /i)[0]} to <PriorityBadge priority={priorityFromAction} />
+                                  </>
+                                ) : (
+                                  <span className="capitalize">{log.action}</span>
+                                )}
+
+                                <span
+                                  className="ml-1.5 font-bold text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
                                   onClick={() => log.taskId && navigateToTask(log.taskId)}
-                                >"{log.target}"</span>
+                                >
+                                  "{log.target}"
+                                </span>
                               </div>
-                              <div className="text-xs text-slate-400 flex items-center gap-1">
+                              <div className="text-[10px] text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
                                 <Clock className="w-3 h-3" />
                                 {new Date(log.createdAt).toLocaleString()}
                               </div>
@@ -419,8 +446,9 @@ export const TaskModal: React.FC = () => {
                       })}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-slate-400 italic">
-                      <p>No activity recorded.</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400 bg-slate-50/50 dark:bg-slate-800/20 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                      <History className="w-10 h-10 mb-2 opacity-20" />
+                      <p className="text-sm font-medium">No activity recorded for this task.</p>
                     </div>
                   )}
                 </div>

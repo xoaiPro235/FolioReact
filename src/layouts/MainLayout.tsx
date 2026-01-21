@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
+import { AppNotification } from '../types';
 import { Bell, LogOut, Layout, User, Moon, Sun, X, Settings, Home, Search, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 
 export const MainLayout: React.FC = () => {
@@ -12,6 +13,7 @@ export const MainLayout: React.FC = () => {
         toggleTheme,
         dismissNotification,
         markNotificationRead,
+        markAllNotificationsRead,
         tasks,
         setGlobalTaskSearch,
         globalTaskSearch,
@@ -33,23 +35,12 @@ export const MainLayout: React.FC = () => {
 
     const unreadCount = notifications.filter(n => !n.read).length;
 
-    const handleNotificationClick = (notif: any) => {
+    const handleNotificationClick = (notif: AppNotification) => {
         markNotificationRead(notif.id);
         setIsNotifOpen(false);
 
-        if (notif.actionType === 'VIEW_TASK' && notif.targetId) {
-            // We need to know which project the task belongs to. 
-            // If the task is in the store, we can find it.
-            const task = tasks.find(t => t.id === notif.targetId);
-            if (task) {
-                navigate(`/project/${task.projectId}/board?selectedIssue=${task.id}`);
-            } else {
-                // If not in store, we might need a better way to find the project ID
-                // For now, if we are in a project, we can try to stay there
-                navigate(`?selectedIssue=${notif.targetId}`);
-            }
-        } else if (notif.actionType === 'VIEW_PROJECT' && notif.targetId) {
-            navigate(`/project/${notif.targetId}`);
+        if (notif.link) {
+            navigate(notif.link);
         }
     };
 
@@ -145,62 +136,94 @@ export const MainLayout: React.FC = () => {
                             {isNotifOpen && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)}></div>
-                                    <div className="absolute right-0 top-12 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 font-semibold text-sm dark:text-white flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                                            Notifications
-                                            {unreadCount > 0 && <span className="text-xs font-bold text-white bg-blue-500 px-2 py-0.5 rounded-full">{unreadCount} new</span>}
-                                        </div>
-                                        <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
-                                            {notifications.length > 0 ? notifications.map(n => (
-                                                <div
-                                                    key={n.id}
-                                                    className={`p-4 border-b border-slate-50 dark:border-slate-800/50 flex gap-3 transition-colors ${n.actionType !== 'NONE' ? 'hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group' : ''
-                                                        } ${!n.read ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''}`}
-                                                    onClick={() => n.actionType !== 'NONE' && handleNotificationClick(n)}
+                                    <div className="absolute right-0 top-12 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 backdrop-blur-md">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-slate-800 dark:text-white">Notifications</h3>
+                                                {unreadCount > 0 && (
+                                                    <span className="bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+                                                        {unreadCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {unreadCount > 0 && (
+                                                <button
+                                                    onClick={() => markAllNotificationsRead()}
+                                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
                                                 >
-                                                    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'SUCCESS' ? 'bg-green-500' :
-                                                        n.type === 'ERROR' ? 'bg-red-500' :
-                                                            n.type === 'WARNING' ? 'bg-yellow-500' : 'bg-blue-500'
-                                                        }`}></div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
-                                                            {n.message}
-                                                        </p>
-                                                        {n.targetName && (
-                                                            <div className="flex items-center gap-1 mt-1">
-                                                                <span className="text-[10px] uppercase font-bold text-slate-400 border border-slate-200 dark:border-slate-700 px-1 rounded">
-                                                                    {n.actionType.replace('VIEW_', '')}
-                                                                </span>
-                                                                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{n.targetName}</span>
-                                                            </div>
-                                                        )}
-                                                        <p className="text-[11px] text-slate-400 mt-1.5">{new Date(n.createdAt).toLocaleString()}</p>
-                                                    </div>
-                                                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                                        {!n.read && (
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}
-                                                                className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
-                                                                title="Mark as read"
-                                                            >
-                                                                <CheckCircle2 size={14} />
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); dismissNotification(n.id); }}
-                                                            className="text-slate-300 hover:text-red-500 p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            title="Dismiss"
+                                                    Mark all as read
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="max-h-[450px] overflow-y-auto scrollbar-thin">
+                                            {notifications.length > 0 ? (
+                                                <div className="py-2">
+                                                    {notifications.map((n, idx) => (
+                                                        <div
+                                                            key={n.id}
+                                                            className={`px-5 py-3.5 flex gap-4 transition-all duration-200 relative group border-b border-slate-50 last:border-0 dark:border-slate-800/30 ${n.link ? 'cursor-pointer' : ''} ${!n.read ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                                                            onClick={() => n.link && handleNotificationClick(n)}
                                                         >
-                                                            <X size={14} />
-                                                        </button>
-                                                    </div>
+                                                            {/* Status Indicator */}
+                                                            {!n.read && (
+                                                                <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div>
+                                                            )}
+
+                                                            {/* Left Content: Type Icon */}
+                                                            <div className="flex-shrink-0 mt-0.5">
+                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${n.type === 'SUCCESS' ? 'bg-green-100 dark:bg-green-900/30 text-green-600' :
+                                                                    n.type === 'ERROR' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
+                                                                        n.type === 'WARNING' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600' :
+                                                                            'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                                                                    }`}>
+                                                                    {n.type === 'ERROR' ? <AlertCircle size={20} /> : n.type === 'WARNING' ? <AlertCircle size={20} /> : <Info size={20} />}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Center Content: Message */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                    <h4 className={`text-xs uppercase tracking-wider font-bold truncate pr-6 ${!n.read ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                                        {n.title || 'Notification'}
+                                                                    </h4>
+                                                                    <span className="text-[10px] text-slate-400 whitespace-nowrap pt-0.5 italic">
+                                                                        {getRelativeTime(n.createdAt)}
+                                                                    </span>
+                                                                </div>
+                                                                <p className={`text-sm leading-relaxed ${!n.read ? 'text-slate-900 dark:text-white font-semibold' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                                    {n.message}
+                                                                </p>
+                                                            </div>
+
+                                                            {/* Right Content: Actions */}
+                                                            <div className="flex flex-col gap-2 flex-shrink-0 self-center">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); dismissNotification(n.id); }}
+                                                                    className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                                                                    title="Dismiss"
+                                                                >
+                                                                    <X size={15} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            )) : (
-                                                <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                                                    <Bell className="w-8 h-8 mb-2 opacity-20" />
-                                                    <p className="text-sm">No notifications</p>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                                                    <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-300 dark:text-slate-700">
+                                                        <Bell size={32} />
+                                                    </div>
+                                                    <h3 className="text-slate-900 dark:text-white font-bold mb-1">No notifications yet</h3>
+                                                    <p className="text-sm text-slate-400">When you have new updates, they'll show up here.</p>
                                                 </div>
                                             )}
+                                        </div>
+
+                                        <div className="p-3 border-t border-slate-100 dark:border-slate-800 text-center bg-slate-50/30 dark:bg-slate-800/30">
+                                            <button className="text-sm font-semibold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                                View Archive
+                                            </button>
                                         </div>
                                     </div>
                                 </>
@@ -274,3 +297,19 @@ const MobileNavItem = ({ icon, active = false, onClick }: any) => (
         {icon}
     </button>
 );
+
+const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return 'Just now';
+};

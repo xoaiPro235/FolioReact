@@ -88,10 +88,8 @@ export interface AppNotification {
   read: boolean;
   type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
   createdAt: string;
-  // Action details for clickable notifications
-  actionType?: 'VIEW_PROJECT' | 'VIEW_TASK' | 'VIEW_COMMENT' | 'NONE';
-  targetId?: string; // projectId, taskId, or commentId
-  targetName?: string; // Project name, Task title, etc.
+  link?: string;      // Direct URL to navigate to
+  title?: string;     // Short summary or context (e.g., "Task Assigned")
 }
 
 export type Theme = 'light' | 'dark';

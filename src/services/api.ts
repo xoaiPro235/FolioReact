@@ -1,12 +1,13 @@
 import axios from 'axios';
 import { supabase } from '../supabaseClient';
 import { Task, TaskStatus, Priority, User, Project, Role, ActivityLog, FileAttachment, ProjectMember } from '../types';
-import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
+import { HubConnectionBuilder, HubConnection, HubConnectionState } from '@microsoft/signalr';
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   headers: {
     'Content-Type': 'application/json',
+    'X-Tunnel-Skip-AntiPhishing-Page': 'true',
   },
 });
 
@@ -231,41 +232,96 @@ export const deleteComment = async (taskId: string, commentId: string): Promise<
   return await axiosClient.delete(`/task/${taskId}/comments/${commentId}`);
 }
 
+// --------NOTIFICATIONS------------
+
+export const fetchNotifications = async (): Promise<any[]> => {
+  return await axiosClient.get('/notifications');
+}
+
+export const markNotificationAsRead = async (id: string): Promise<void> => {
+  await axiosClient.put(`/notifications/${id}/read`);
+}
+
+export const markAllNotificationsAsRead = async (): Promise<void> => {
+  await axiosClient.put('/notifications/read-all');
+}
+
 
 
 // --------SIGNALR / REALTIME------------
 
 export class SignalRService {
   private connection: HubConnection | null = null;
+  private currentProjectId: string | null = null;
+  private isConnecting: boolean = false;
 
-  public async connect(projectId: string, onUpdate: (type: string, payload: any) => void) {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) return;
+  public async connect(projectId: string, fullName: string, avatarUrl: string, onUpdate: (type: string, payload: any) => void) {
+    if (this.isConnecting) return;
 
-    this.connection = new HubConnectionBuilder()
-      .withUrl(import.meta.env.VITE_HUB_URL, { accessTokenFactory: () => token })
-      .withAutomaticReconnect()
-      .build();
+    // If already connected to the same project, don't restart
+    if (this.connection && this.currentProjectId === projectId) {
+      if (this.connection.state === HubConnectionState.Connected || this.connection.state === HubConnectionState.Connecting) {
+        return;
+      }
+    }
 
-    this.connection.on("TaskUpdated", (task) => onUpdate("TaskUpdated", task));
-    this.connection.on("TaskCreated", (task) => onUpdate("TaskCreated", task));
-    this.connection.on("AttachmentAdded", (file) => onUpdate("AttachmentAdded", file));
-    this.connection.on("AttachmentDeleted", (data) => onUpdate("AttachmentDeleted", data));
-
+    this.isConnecting = true;
     try {
+      // If connecting to a DIFFERENT project, we MUST disconnect first
+      if (this.connection) {
+        await this.disconnect();
+      }
+
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+
+      this.connection = new HubConnectionBuilder()
+        .withUrl(import.meta.env.VITE_HUB_URL, {
+          accessTokenFactory: () => token,
+          headers: {
+            'X-Tunnel-Skip-AntiPhishing-Page': 'true'
+          }
+        })
+        .withAutomaticReconnect()
+        .build();
+
+      this.currentProjectId = projectId;
+
+      this.connection.on("TaskUpdated", (task) => onUpdate("TaskUpdated", task));
+      this.connection.on("TaskCreated", (task) => onUpdate("TaskCreated", task));
+      this.connection.on("AttachmentAdded", (file) => onUpdate("AttachmentAdded", file));
+      this.connection.on("AttachmentDeleted", (data) => onUpdate("AttachmentDeleted", data));
+      this.connection.on("ReceiveNotification", (notification) => onUpdate("ReceiveNotification", notification));
+      this.connection.on("CommentAdded", (comment) => onUpdate("CommentAdded", comment));
+      this.connection.on("CommentDeleted", (taskId, commentId) => onUpdate("CommentDeleted", { taskId, commentId }));
+      this.connection.on("ActivityLogAdded", (log) => onUpdate("ActivityLogAdded", log));
+
       await this.connection.start();
-      await this.connection.invoke("JoinProject", projectId);
-      console.log(`[SignalR] Connected to project: ${projectId}`);
+
+      if (this.connection.state === HubConnectionState.Connected) {
+        await this.connection.invoke("JoinProject", projectId, fullName, avatarUrl);
+        console.log(`[SignalR] Successfully joined project: ${projectId}`);
+      }
     } catch (err) {
       console.error("[SignalR] Connection failed:", err);
+      this.currentProjectId = null;
+    } finally {
+      this.isConnecting = false;
     }
   }
 
-  public disconnect() {
+  public async disconnect() {
     if (this.connection) {
-      this.connection.stop();
-      console.log('[SignalR] Disconnected');
+      try {
+        await this.connection.stop();
+        console.log('[SignalR] Disconnected');
+      } catch (err) {
+        console.error('[SignalR] Error during disconnect:', err);
+      } finally {
+        this.connection = null;
+        this.currentProjectId = null;
+      }
     }
   }
 }
