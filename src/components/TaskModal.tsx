@@ -9,9 +9,10 @@ import { CreateTaskModal } from './CreateTaskModal';
 import { UserSelect } from './UserSelect';
 import {
   StatusSelect, PrioritySelect, AttachmentList, ConfirmDialog,
-  StatusBadge, PriorityBadge
+  StatusBadge, PriorityBadge, DateInput
 } from './Shared';
 import { fetchTaskActivities } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 export const TaskModal: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -350,7 +351,7 @@ export const TaskModal: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-baseline gap-2">
                               <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{u?.name}</span>
-                              <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleString()}</span>
+                              <span className="text-xs text-slate-400">{formatDateTime(c.createdAt)}</span>
                             </div>
                             {c.userId === currentUser?.id && (
                               <button
@@ -438,7 +439,7 @@ export const TaskModal: React.FC = () => {
                               </div>
                               <div className="text-[10px] text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
                                 <Clock className="w-3 h-3" />
-                                {new Date(log.createdAt).toLocaleString()}
+                                {formatDateTime(log.createdAt)}
                               </div>
                             </div>
                           </div>
@@ -464,22 +465,20 @@ export const TaskModal: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5 flex items-center gap-2"><Calendar className="w-3 h-3" /> Start Date</label>
-                    <input
-                      disabled={readOnly}
-                      type="date"
-                      value={task.startDate?.split('T')[0] ?? ''}
-                      onChange={(e) => handleDateChange('startDate', e.target.value)}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none h-10"
+                    <DateInput
+                      value={task.startDate}
+                      onChange={(val) => handleDateChange('startDate', val)}
+                      readOnly={readOnly}
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-lg h-10"
                     />
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5 flex items-center gap-2"><Calendar className="w-3 h-3" /> Due Date</label>
-                    <input
-                      disabled={readOnly}
-                      type="date"
-                      value={task.dueDate?.split('T')[0] ?? ''}
-                      onChange={(e) => handleDateChange('dueDate', e.target.value)}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-4 py-2.5 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none h-10"
+                    <DateInput
+                      value={task.dueDate}
+                      onChange={(val) => handleDateChange('dueDate', val)}
+                      readOnly={readOnly}
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-lg h-10"
                     />
                   </div>
                 </div>
@@ -498,7 +497,7 @@ export const TaskModal: React.FC = () => {
             </div>
 
             <div className="pt-6 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-400">
-              <p>Created: {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}</p>
+              <p>Created: {formatDate(task.createdAt)}</p>
             </div>
           </div>
         </div>

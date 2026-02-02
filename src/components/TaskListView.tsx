@@ -5,7 +5,7 @@ import { Task, TaskStatus, Priority, Role } from '../types';
 import { ChevronRight, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserSelect } from './UserSelect';
-import { StatusSelect, PrioritySelect, ConfirmDialog } from './Shared';
+import { StatusSelect, PrioritySelect, ConfirmDialog, DateInput } from './Shared';
 import { useTasks, useUpdateTask, useCreateTask, useDeleteTask } from '../hooks/useTasks';
 import { Skeleton } from './Skeleton';
 
@@ -55,10 +55,10 @@ const TaskRow = ({ task, allTasks, canEdit, onSelect, onAddSubtask, onAssigneeCh
                 <td className="px-6 py-4 w-40"><StatusSelect value={task.status} onChange={(v: TaskStatus) => onPatch(task.id, { status: v })} readOnly={!canEdit} /></td>
                 <td className="px-6 py-4 w-40"><PrioritySelect value={task.priority} onChange={(v: Priority) => onPatch(task.id, { priority: v })} readOnly={!canEdit} /></td>
                 <td className="px-6 py-4 w-36">
-                    <input type="date" value={task.startDate || ''} onChange={(e) => onPatch(task.id, { startDate: e.target.value })} disabled={!canEdit} className="bg-transparent text-sm text-slate-600 dark:text-slate-400 font-mono w-full outline-none dark:[color-scheme:dark]" />
+                    <DateInput value={task.startDate} onChange={(val) => onPatch(task.id, { startDate: val })} readOnly={!canEdit} />
                 </td>
                 <td className="px-6 py-4 w-36">
-                    <input type="date" value={task.dueDate || ''} onChange={(e) => onPatch(task.id, { dueDate: e.target.value })} disabled={!canEdit} className="bg-transparent text-sm text-slate-600 dark:text-slate-400 font-mono w-full outline-none dark:[color-scheme:dark]" />
+                    <DateInput value={task.dueDate} onChange={(val) => onPatch(task.id, { dueDate: val })} readOnly={!canEdit} />
                 </td>
                 <td className="px-6 py-4 w-12 text-right">
                     {canEdit && (
@@ -115,7 +115,12 @@ export const TaskListView: React.FC = () => {
     const deleteMutation = useDeleteTask();
     const [taskToDelete, setTaskToDelete] = React.useState<string | null>(null);
 
-    const projectMembers = React.useMemo(() => users.filter(u => currentProject?.members.some(m => m.userId === u.id)), [users, currentProject]);
+    const projectMembers = React.useMemo(() => {
+        return users.filter(u => {
+            const member = currentProject?.members.find(m => m.userId === u.id);
+            return member && member.role !== Role.VIEWER;
+        });
+    }, [users, currentProject?.members]);
     const canEdit = getUserRole() !== Role.VIEWER;
 
     const filteredTasks = tasks.filter(t => !t.parentTaskId && (t.title.toLowerCase().includes(globalTaskSearch.toLowerCase()) || t.status.toLowerCase().includes(globalTaskSearch.toLowerCase())));

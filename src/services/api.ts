@@ -79,6 +79,20 @@ export const registerUser = async (userData: any): Promise<void> => {
   if (error) throw new Error(error.message);
 };
 
+export const resetPasswordForEmail = async (email: string): Promise<void> => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  if (error) throw new Error(error.message);
+};
+
+export const updatePassword = async (newPassword: string): Promise<void> => {
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+  if (error) throw new Error(error.message);
+};
+
 // --------USER------------
 
 export const fetchUsers = async (): Promise<User[]> => {
@@ -111,6 +125,10 @@ export const fetchProjects = async (userId: string): Promise<Project[]> => {
 
 export const createProject = async (data: { name: string, description?: string }): Promise<Project> => {
   return await axiosClient.post('/project', data);
+};
+
+export const updateProjectApi = async (projectId: string, data: { name: string, description?: string }): Promise<Project> => {
+  return await axiosClient.patch(`/project/${projectId}`, data);
 };
 
 export const fetchProjectMembers = async (projectId: string): Promise<(User & { role: Role })[]> => {

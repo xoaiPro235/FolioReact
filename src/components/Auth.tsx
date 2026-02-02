@@ -4,10 +4,10 @@ import { Layout, AlertCircle, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Auth: React.FC = () => {
-  const { login, register, isLoading } = useStore();
+  const { login, register, resetPassword, isLoading } = useStore();
 
-  // State quản lý tab (Đăng nhập / Đăng ký)
-  const [isLogin, setIsLogin] = useState(true);
+  // Auth Modes: 'login' | 'register' | 'forgot' | 'reset-sent'
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset-sent'>('login');
 
   // State thông báo lỗi
   const [loginError, setLoginError] = useState('');
@@ -22,9 +22,9 @@ export const Auth: React.FC = () => {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
 
-  // Hàm chuyển đổi tab (Xóa dữ liệu cũ cho sạch)
+  // Hàm chuyển đổi tab
   const toggleMode = () => {
-    setIsLogin(!isLogin);
+    setMode(mode === 'login' ? 'register' : 'login');
     setLoginError('');
     // Reset form
     setEmail(''); setPassword('');
@@ -36,13 +36,13 @@ export const Auth: React.FC = () => {
     setLoginError(''); // Xóa lỗi cũ
 
     try {
-      if (isLogin) {
+      if (mode === 'login') {
         if (!email || !password) {
           setLoginError('Please enter both email and password.');
           return;
         }
         await login(email, password);
-      } else {
+      } else if (mode === 'register') {
         if (!regFirstName || !regLastName || !regEmail || !regPassword) {
           setLoginError('Please fill in all fields.');
           return;
@@ -54,6 +54,13 @@ export const Auth: React.FC = () => {
           email: regEmail,
           password: regPassword
         });
+      } else if (mode === 'forgot') {
+        if (!email) {
+          setLoginError('Please enter your email.');
+          return;
+        }
+        await resetPassword(email);
+        setMode('reset-sent');
       }
     } catch (error: any) {
       console.error("Auth Error:", error);
@@ -138,19 +145,25 @@ export const Auth: React.FC = () => {
             <div className="flex-1 p-8 sm:p-10">
               <div className="mb-10 text-center lg:text-left">
                 <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">
-                  {isLogin ? 'Welcome Back' : 'Get Started'}
+                  {mode === 'login' ? 'Welcome Back' : mode === 'register' ? 'Get Started' : mode === 'forgot' ? 'Reset Password' : 'Check your email'}
                 </h3>
                 <p className="text-slate-500 dark:text-slate-400 font-medium">
-                  {isLogin ? 'Enter your details to manage your projects' : 'Create an account to join the community'}
+                  {mode === 'login'
+                    ? 'Enter your details to manage your projects'
+                    : mode === 'register'
+                      ? 'Create an account to join the community'
+                      : mode === 'forgot'
+                        ? 'Enter your email to receive a reset link'
+                        : 'We have sent a password reset link to your email'}
                 </p>
               </div>
 
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={isLogin ? 'login' : 'register'}
-                  initial={{ opacity: 0, x: isLogin ? -20 : 20 }}
+                  key={mode}
+                  initial={{ opacity: 0, x: mode === 'login' ? -20 : 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: isLogin ? 20 : -20 }}
+                  exit={{ opacity: 0, x: mode === 'login' ? 20 : -20 }}
                   transition={{ duration: 0.3 }}
                 >
                   <form onSubmit={handleSubmit} className="space-y-6">
@@ -165,7 +178,7 @@ export const Auth: React.FC = () => {
                       </motion.div>
                     )}
 
-                    {isLogin ? (
+                    {mode === 'login' ? (
                       <div className="space-y-5">
                         <div className="group">
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 ml-1 transition-colors group-focus-within:text-blue-600">Email Address</label>
@@ -181,7 +194,13 @@ export const Auth: React.FC = () => {
                         <div className="group">
                           <div className="flex justify-between items-center mb-2 ml-1">
                             <label className="text-sm font-bold text-slate-700 dark:text-slate-300 transition-colors group-focus-within:text-blue-600">Password</label>
-                            <button type="button" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors">Forgot password?</button>
+                            <button
+                              type="button"
+                              onClick={() => setMode('forgot')}
+                              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+                            >
+                              Forgot password?
+                            </button>
                           </div>
                           <input
                             type="password"
@@ -193,7 +212,7 @@ export const Auth: React.FC = () => {
                           />
                         </div>
                       </div>
-                    ) : (
+                    ) : mode === 'register' ? (
                       <div className="space-y-5">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="group">
@@ -214,22 +233,61 @@ export const Auth: React.FC = () => {
                           <input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" placeholder="••••••••" required />
                         </div>
                       </div>
+                    ) : mode === 'forgot' ? (
+                      <div className="space-y-5">
+                        <div className="group">
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 ml-1 transition-colors group-focus-within:text-blue-600">Email Address</label>
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all duration-300 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                            placeholder="name@company.com"
+                            required
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMode('login')}
+                          className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+                        >
+                          Back to Sign In
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-6 text-center py-4">
+                        <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Layout className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-400">
+                          We've sent an email to <span className="font-bold text-slate-900 dark:text-white">{email}</span> with instructions to reset your password.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setMode('login')}
+                          className="text-blue-600 dark:text-blue-400 font-black hover:text-blue-700 transition-colors"
+                        >
+                          Return to Sign In
+                        </button>
+                      </div>
                     )}
 
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-5 px-4 rounded-2xl transition-all flex items-center justify-center mt-10 shadow-2xl shadow-blue-500/30 active:scale-[0.98] disabled:opacity-70 group"
-                    >
-                      {isLoading ? (
-                        <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <span className="flex items-center gap-3">
-                          {isLogin ? 'Sign In' : 'Join Folio'}
-                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </span>
-                      )}
-                    </button>
+                    {mode !== 'reset-sent' && (
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-5 px-4 rounded-2xl transition-all flex items-center justify-center mt-10 shadow-2xl shadow-blue-500/30 active:scale-[0.98] disabled:opacity-70 group"
+                      >
+                        {isLoading ? (
+                          <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <span className="flex items-center gap-3">
+                            {mode === 'login' ? 'Sign In' : mode === 'register' ? 'Join Folio' : 'Send Reset Link'}
+                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                          </span>
+                        )}
+                      </button>
+                    )}
                   </form>
                 </motion.div>
               </AnimatePresence>
@@ -237,14 +295,16 @@ export const Auth: React.FC = () => {
 
             <div className="p-8 sm:p-10 bg-slate-100/30 dark:bg-slate-800/30 border-t border-slate-200/50 dark:border-slate-700/50 text-center">
               <p className="text-slate-500 dark:text-slate-400 font-bold">
-                {isLogin ? "New to the platform?" : "Already part of the team?"}
-                <button
-                  type="button"
-                  className="text-blue-600 dark:text-blue-400 font-black ml-2 hover:text-blue-700 dark:hover:text-blue-300 transition-colors focus:outline-none"
-                  onClick={toggleMode}
-                >
-                  {isLogin ? 'Create free account' : 'Sign in here'}
-                </button>
+                {mode === 'login' ? "New to the platform?" : mode === 'register' ? "Already part of the team?" : ""}
+                {mode !== 'forgot' && mode !== 'reset-sent' && (
+                  <button
+                    type="button"
+                    className="text-blue-600 dark:text-blue-400 font-black ml-2 hover:text-blue-700 dark:hover:text-blue-300 transition-colors focus:outline-none"
+                    onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                  >
+                    {mode === 'login' ? 'Create free account' : 'Sign in here'}
+                  </button>
+                )}
               </p>
             </div>
           </div>

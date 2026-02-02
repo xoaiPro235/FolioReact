@@ -5,13 +5,13 @@ import { useStore } from '../store';
 
 const ProjectPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { currentProject, loadProjectInitial } = useStore();
+    const { currentProject, loadProjectData } = useStore();
 
     useEffect(() => {
         if (id && (!currentProject || currentProject.id !== id)) {
-            loadProjectInitial(id);
+            loadProjectData(id);
         }
-    }, [id, loadProjectInitial, currentProject]);
+    }, [id, loadProjectData, currentProject]);
 
     return (
         <ProjectView>

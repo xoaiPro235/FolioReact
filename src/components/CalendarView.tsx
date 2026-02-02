@@ -72,7 +72,7 @@ export const CalendarView: React.FC = () => {
                 <div className="flex items-center gap-4">
                     {/* SỬA LỖI: Thêm min-w-[220px] để cố định chiều rộng, tránh nhảy nút */}
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white capitalize min-w-[220px]">
-                        {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        {currentDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
                     </h2>
                     <div className="flex items-center gap-1 bg-white dark:bg-slate-700 rounded-lg p-1 border border-slate-200 dark:border-slate-600">
                         <button onClick={prevMonth} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-600 rounded transition-colors text-slate-500 dark:text-slate-300">

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Task, TaskStatus, Priority } from '../types';
+import { Task, TaskStatus, Priority, Role } from '../types';
 import { useStore } from '../store';
 import { X, Calendar, AlignLeft, Flag, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCreateTask } from '../hooks/useTasks';
 // Import các component UI đẹp đã có
 import { UserSelect } from './UserSelect';
-import { StatusSelect, PrioritySelect } from './Shared';
+import { StatusSelect, PrioritySelect, DateInput } from './Shared';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -30,10 +30,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  // Lọc danh sách user: Chỉ lấy những người thuộc project hiện tại
-  // const projectMembers = users.filter(u =>
-  //   currentProject?.members.some(m => m.userId === u.id)
-  // );
+  // Lọc danh sách user: Chỉ lấy những người thuộc project hiện tại và không phải là viewer
+  const projectMembers = React.useMemo(() => {
+    return users.filter(u => {
+      const member = currentProject?.members.find(m => m.userId === u.id);
+      return member && member.role !== Role.VIEWER;
+    });
+  }, [users, currentProject?.members]);
 
   useEffect(() => {
     if (initialStatus) setStatus(initialStatus);
@@ -151,7 +154,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assignee</label>
                   <UserSelect
-                    users={users}
+                    users={projectMembers}
                     selectedUserId={assigneeId}
                     onChange={setAssigneeId}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg h-11"

@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { Activity, History, Clock, User, CheckCircle2, MessageSquare, PlusCircle, Pencil, Trash2, Paperclip, AlertCircle } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from './Shared';
 import { motion } from 'framer-motion';
+import { formatDateTime } from '../utils/dateUtils';
 
 const getActionIcon = (action: string) => {
     const act = action.toLowerCase();
@@ -91,7 +92,7 @@ export const ActivityLogView: React.FC = () => {
                                                 </span>
                                                 <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
                                                     <Clock className="w-3.5 h-3.5" />
-                                                    {new Date(act.createdAt).toLocaleString()}
+                                                    {formatDateTime(act.createdAt)}
                                                 </span>
                                             </div>
 

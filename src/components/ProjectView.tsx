@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ViewState, TaskStatus, Priority, Role, TabType } from '../types';
 import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
-import { LayoutGrid, Kanban, List, Calendar as CalendarIcon, Users, ArrowLeft, History, Plus, Activity, Clock } from 'lucide-react';
+import { LayoutGrid, Kanban, List, Calendar as CalendarIcon, Users, ArrowLeft, History, Plus, Activity, Clock, Edit2, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { TaskModal } from './TaskModal';
@@ -22,11 +22,34 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
     getUserRole,
     selectedTaskId,
     setSelectedTask,
+    updateProject,
     users
   } = useStore();
 
   const role = getUserRole();
   const canEdit = role !== Role.VIEWER;
+  const isOwner = role === Role.OWNER;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+
+  useEffect(() => {
+    if (currentProject) {
+      setEditName(currentProject.name);
+      setEditDesc(currentProject.description);
+    }
+  }, [currentProject]);
+
+  const handleSaveProject = async () => {
+    if (!currentProject) return;
+    try {
+      await updateProject(currentProject.id, editName, editDesc);
+      setIsEditing(false);
+    } catch (error) {
+      // Error handled by store notification
+    }
+  };
 
   const [searchParams] = useSearchParams();
   const selectedIssue = searchParams.get('selectedIssue');
@@ -95,11 +118,49 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ children }) => {
         </button>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              {currentProject.name}
-              <span className="text-xs font-normal bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">{role} VIEW</span>
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{currentProject.description}</p>
+            {isEditing ? (
+              <div className="space-y-3 min-w-[300px]">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="text-2xl font-bold bg-slate-50 dark:bg-slate-800 border border-blue-500 rounded px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="Project Name"
+                    autoFocus
+                  />
+                  <button onClick={handleSaveProject} className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                    <Check className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => { setIsEditing(false); setEditName(currentProject.name); setEditDesc(currentProject.description); }} className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="Project Description"
+                />
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 group">
+                  {currentProject.name}
+                  <span className="text-xs font-normal bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">{role} VIEW</span>
+                  {isOwner && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-blue-500 transition-all"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{currentProject.description}</p>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-6">

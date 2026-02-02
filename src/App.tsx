@@ -14,6 +14,7 @@ import { CalendarView } from './components/CalendarView';
 import { TeamView } from './components/TeamView';
 import { ActivityLogView } from './components/ActivityLogView';
 import IntroPage from './pages/IntroPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     const { currentUser, isInitialAuthChecked } = useStore();
@@ -53,6 +54,7 @@ export default function App() {
             <Routes>
                 <Route path="/intro" element={<PublicRoute><IntroPage /></PublicRoute>} />
                 <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                 <Route path="/" element={
                     <ProtectedRoute>

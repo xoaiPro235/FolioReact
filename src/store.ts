@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser, fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser, fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, updateProjectApi, resetPasswordForEmail, updatePassword as updatePasswordApi } from './services/api';
 import { supabase } from './supabaseClient';
 import { queryClient } from './queryClient';
 
@@ -35,6 +35,8 @@ interface AppState {
   register: (data: any) => Promise<void>;
   logout: () => void;
   updateProfile: (data: { name?: string, avatarUrl?: string, bio?: string }) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   deleteAccount: () => void;
 
   goToWorkspace: () => void;
@@ -45,6 +47,7 @@ interface AppState {
   setWorkspaceSearch: (query: string) => void;
 
   createProject: (name: string, description: string) => void;
+  updateProject: (projectId: string, name: string, description: string) => Promise<void>;
   deleteProject: (projectId: string) => void;
 
   loadProjectData: (projectId: string) => Promise<void>;
@@ -248,6 +251,32 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  resetPassword: async (email) => {
+    set({ isLoading: true });
+    try {
+      await resetPasswordForEmail(email);
+      set({ isLoading: false });
+      get().addNotification("Reset link sent to your email!", "SUCCESS");
+    } catch (error: any) {
+      set({ isLoading: false });
+      get().addNotification(error.message || "Failed to send reset link", "ERROR");
+      throw error;
+    }
+  },
+
+  updatePassword: async (password) => {
+    set({ isLoading: true });
+    try {
+      await updatePasswordApi(password);
+      set({ isLoading: false });
+      get().addNotification("Password updated successfully!", "SUCCESS");
+    } catch (error: any) {
+      set({ isLoading: false });
+      get().addNotification(error.message || "Failed to update password", "ERROR");
+      throw error;
+    }
+  },
+
   deleteAccount: async () => {
     if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) return;
 
@@ -441,6 +470,28 @@ export const useStore = create<AppState>((set, get) => ({
       console.error("Failed to create project", error);
       set({ isLoading: false });
       get().addNotification("Failed to create project", "ERROR");
+    }
+  },
+
+  updateProject: async (projectId, name, desc) => {
+    set({ isLoading: true });
+    try {
+      const updatedProject = await updateProjectApi(projectId, { name, description: desc });
+
+      set((state) => ({
+        projects: state.projects.map(p => p.id === projectId ? { ...p, ...updatedProject } : p),
+        currentProject: state.currentProject?.id === projectId
+          ? { ...state.currentProject, ...updatedProject }
+          : state.currentProject,
+        isLoading: false
+      }));
+
+      get().addNotification("Project updated successfully", "SUCCESS");
+    } catch (error) {
+      console.error("Failed to update project", error);
+      set({ isLoading: false });
+      get().addNotification("Failed to update project", "ERROR");
+      throw error;
     }
   },
 

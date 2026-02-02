@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { TaskStatus, Priority, FileAttachment } from '../types';
-import { ArrowUp, ArrowRight, ArrowDown, Circle, Clock, Loader2, CheckCircle2, ChevronDown, Paperclip, FileText, Download, Trash2, X } from 'lucide-react';
+import { ArrowUp, ArrowRight, ArrowDown, Circle, Clock, Loader2, CheckCircle2, ChevronDown, Paperclip, FileText, Download, Trash2, X, Calendar } from 'lucide-react';
+import { formatDate } from '../utils/dateUtils';
 
 // ==========================================
 // UNIFIED COLOR SYSTEM (Single Source of Truth)
@@ -341,5 +342,40 @@ export const ConfirmDialog: React.FC<{
             </div>
         </>,
         document.body
+    );
+};
+
+// ==========================================
+// DATE INPUT COMPONENT
+// ==========================================
+
+interface DateInputProps {
+    value?: string;
+    onChange: (val: string) => void;
+    readOnly?: boolean;
+    className?: string;
+    placeholder?: string;
+}
+
+export const DateInput: React.FC<DateInputProps> = ({ value, onChange, readOnly, className = '', placeholder = 'Pick date' }) => {
+    // value format always yyyy-mm-dd from native picker
+    const displayDate = value ? formatDate(value) : placeholder;
+
+    return (
+        <div className={`relative flex items-center justify-center overflow-hidden transition-all group ${className}`}>
+            <span className={`text-sm font-mono truncate flex-1 text-center ${value ? 'text-slate-600 dark:text-slate-400' : 'text-slate-400 dark:text-slate-600'}`}>
+                {displayDate}
+            </span>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Calendar className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                <input
+                    type="date"
+                    disabled={readOnly}
+                    value={value?.split('T')[0] || ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-default"
+                />
+            </div>
+        </div>
     );
 };
