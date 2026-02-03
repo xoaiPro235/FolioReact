@@ -146,23 +146,29 @@ export const useStore = create<AppState>((set, get) => ({
 
         set({ currentUser: user });
 
-        // Check if there was a previous view/project open
+        // Tải dữ liệu toàn cục (Thông báo & Dự án) ngay khi khởi tạo xong Auth
+        await Promise.all([
+          get().loadNotifications(),
+          get().loadWorkspaceData(data.session.user.id)
+        ]);
+
+        // Kiểm tra xem trước đó đang ở view nào
         const lastView = localStorage.getItem('lastView') as ViewState;
         const lastProjectId = localStorage.getItem('lastProjectId');
 
         if (lastView === 'PROJECT' && lastProjectId) {
-          // MUST load workspace data first so projects list is populated
-          await get().loadWorkspaceData(data.session.user.id);
           // Restore to previous project
           await get().loadProjectData(lastProjectId);
 
-          // Connect SignalR for real-time notifications - MOVED to loadProjectInitial
+          // Connect SignalR for real-time notifications
           const user = get().currentUser;
           if (user) {
-            await get().loadNotifications();
+            const { signalRService } = await import('./services/api');
+            await signalRService.connect(lastProjectId, user.name, user.avatar, (type, payload) => {
+              get().handleSignalRUpdate(type, payload);
+            });
           }
         } else if (lastView === 'PROFILE') {
-          await get().loadWorkspaceData(data.session.user.id);
           get().goToProfile();
         } else {
           // Default to workspace handled by App.tsx router index route
@@ -187,17 +193,24 @@ export const useStore = create<AppState>((set, get) => ({
       }
 
       // 2. Lưu currentUser vào Store ngay lập tức
-      set({ currentUser: user, isLoading: false });
+      set({ currentUser: user });
 
-      // 3. Connect SignalR if there was a last project
+      // 3. Tải dữ liệu ban đầu ngay sau khi đăng nhập (Thông báo & Dự án)
+      await Promise.all([
+        get().loadNotifications(),
+        get().loadWorkspaceData(user.id)
+      ]);
+
+      // 4. Kết nối SignalR nếu có project cũ đang mở
       const lastProjectId = localStorage.getItem('lastProjectId');
-      if (lastProjectId && user) {
+      if (lastProjectId) {
         const { signalRService } = await import('./services/api');
         await signalRService.connect(lastProjectId, user.name, user.avatar, (type, payload) => {
           get().handleSignalRUpdate(type, payload);
         });
-        await get().loadNotifications();
       }
+
+      set({ isLoading: false });
       // Navigation will be handled by App.tsx because currentUser is now set
 
     } catch (e) {

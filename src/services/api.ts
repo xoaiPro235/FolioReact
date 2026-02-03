@@ -59,6 +59,7 @@ export const loginUser = async (
     // Ưu tiên lấy Name và Avatar từ bảng profiles trong DB
     name: profile?.name ?? data.user.user_metadata?.full_name ?? data.user.email!.split("@")[0],
     avatar: profile?.avatar_url ?? data.user.user_metadata?.avatar_url ?? "",
+    bio: profile?.bio ?? "",
     isOnline: true,
   };
 };
