@@ -80,8 +80,9 @@ export const registerUser = async (userData: any): Promise<void> => {
 };
 
 export const resetPasswordForEmail = async (email: string): Promise<void> => {
+  const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
+    redirectTo: `${siteUrl}/reset-password`,
   });
   if (error) throw new Error(error.message);
 };

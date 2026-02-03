@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { ArrowLeft, Save, Trash2, AlertTriangle, User } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, AlertTriangle, User, KeyRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const Profile: React.FC = () => {
-    const { currentUser, updateProfile, deleteAccount, goToWorkspace } = useStore();
+    const { currentUser, updateProfile, deleteAccount, goToWorkspace, resetPassword } = useStore();
     const navigate = useNavigate();
 
     const [name, setName] = useState(currentUser?.name || '');
@@ -84,6 +84,25 @@ export const Profile: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Security Section */}
+                    <div className="p-8 border-b border-slate-100 dark:border-slate-800">
+                        <h3 className="text-slate-900 dark:text-white font-bold mb-4 flex items-center gap-2 text-lg">
+                            <KeyRound className="w-5 h-5 text-blue-500" /> Security
+                        </h3>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Password Management</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Receive a secure link to update your password via email.</p>
+                            </div>
+                            <button
+                                onClick={() => resetPassword(currentUser.email)}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <KeyRound className="w-4 h-4" /> Reset via Email
+                            </button>
                         </div>
                     </div>
 
