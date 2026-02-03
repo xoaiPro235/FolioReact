@@ -74,6 +74,7 @@ interface AppState {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   dismissNotification: (id: string) => void;
+  deleteNotification: (id: string) => Promise<void>;
 
   handleSignalRUpdate: (type: string, payload: any) => void;
 
@@ -881,6 +882,23 @@ export const useStore = create<AppState>((set, get) => ({
     set(state => ({
       notifications: state.notifications.filter(n => n.id !== id)
     }));
+  },
+
+  deleteNotification: async (id) => {
+    // 1. Update UI immediately
+    set(state => ({
+      notifications: state.notifications.filter(n => n.id !== id)
+    }));
+
+    // 2. Call API (If not a temporary toast-like notification)
+    if (!id.startsWith('toast-') && !id.startsWith('n')) {
+      try {
+        const { deleteNotification: deleteApi } = await import('./services/api');
+        await deleteApi(id);
+      } catch (error) {
+        console.error("Failed to delete notification:", error);
+      }
+    }
   },
 
   handleSignalRUpdate: (type, payload) => {

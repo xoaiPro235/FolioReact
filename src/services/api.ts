@@ -265,6 +265,10 @@ export const markAllNotificationsAsRead = async (): Promise<void> => {
   await axiosClient.put('/notifications/read-all');
 }
 
+export const deleteNotification = async (id: string): Promise<void> => {
+  await axiosClient.delete(`/notifications/${id}`);
+}
+
 
 
 // --------SIGNALR / REALTIME------------
