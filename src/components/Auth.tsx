@@ -196,7 +196,7 @@ export const Auth: React.FC = () => {
                             <label className="text-sm font-bold text-slate-700 dark:text-slate-300 transition-colors group-focus-within:text-blue-600">Password</label>
                             <button
                               type="button"
-                              onClick={() => setMode('forgot')}
+                              onClick={() => { setMode('forgot'); setLoginError(''); }}
                               className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
                             >
                               Forgot password?
@@ -248,7 +248,7 @@ export const Auth: React.FC = () => {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setMode('login')}
+                          onClick={() => { setMode('login'); setLoginError(''); }}
                           className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
                         >
                           Back to Sign In
@@ -264,7 +264,7 @@ export const Auth: React.FC = () => {
                         </p>
                         <button
                           type="button"
-                          onClick={() => setMode('login')}
+                          onClick={() => { setMode('login'); setLoginError(''); }}
                           className="text-blue-600 dark:text-blue-400 font-black hover:text-blue-700 transition-colors"
                         >
                           Return to Sign In
@@ -300,7 +300,7 @@ export const Auth: React.FC = () => {
                   <button
                     type="button"
                     className="text-blue-600 dark:text-blue-400 font-black ml-2 hover:text-blue-700 dark:hover:text-blue-300 transition-colors focus:outline-none"
-                    onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                    onClick={toggleMode}
                   >
                     {mode === 'login' ? 'Create free account' : 'Sign in here'}
                   </button>

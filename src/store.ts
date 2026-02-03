@@ -11,6 +11,7 @@ interface AppState {
   // currentView: ViewState; // Routing handles this now
   theme: Theme;
   notifications: AppNotification[];
+  toasts: { id: string; message: string; type: AppNotification['type'] }[];
 
   // Navigation & Modal State
   selectedTaskId: string | null; // Global modal control
@@ -78,6 +79,10 @@ interface AppState {
 
   handleSignalRUpdate: (type: string, payload: any) => void;
 
+  // Toast Actions
+  addToast: (message: string, type?: AppNotification['type']) => void;
+  removeToast: (id: string) => void;
+
   // Team
   changeMemberRole: (userId: string, newRole: Role) => void;
   inviteUserToProject: (user: User, role: Role) => void;
@@ -92,6 +97,7 @@ export const useStore = create<AppState>((set, get) => ({
   // currentView: 'AUTH',
   theme: 'light',
   notifications: [],
+  toasts: [],
   selectedTaskId: null,
   globalTaskSearch: '',
   projects: [],
@@ -804,6 +810,7 @@ export const useStore = create<AppState>((set, get) => ({
       title: type === 'ERROR' ? 'Error' : type === 'SUCCESS' ? 'Success' : 'Info'
     };
     set(state => ({ notifications: [newNotif, ...state.notifications] }));
+    get().addToast(msg, type);
   },
 
   addDetailedNotification: (notif) => {
@@ -830,6 +837,7 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return { notifications: [newNotif, ...state.notifications] };
     });
+    get().addToast(newNotif.message, newNotif.type);
   },
 
   loadNotifications: async () => {
@@ -1108,5 +1116,23 @@ export const useStore = create<AppState>((set, get) => ({
     if (!currentProject || !currentUser) return null;
     const member = currentProject.members.find(m => m.userId === currentUser.id);
     return member ? (member.role as Role) : null;
+  },
+
+  addToast: (message, type = 'INFO') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    set(state => ({
+      toasts: [...state.toasts, { id, message, type }]
+    }));
+
+    // Auto remove after 2s
+    setTimeout(() => {
+      get().removeToast(id);
+    }, 2000);
+  },
+
+  removeToast: (id) => {
+    set(state => ({
+      toasts: state.toasts.filter(t => t.id !== id)
+    }));
   }
 }));

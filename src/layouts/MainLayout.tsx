@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { AppNotification } from '../types';
 import { Bell, LogOut, Layout, User, Moon, Sun, X, Settings, Home, Search, CheckCircle2, AlertCircle, Info, MoreVertical, Trash2, Check } from 'lucide-react';
+import { ToastOverlay } from '../components/ToastOverlay';
 
 export const MainLayout: React.FC = () => {
     const {
@@ -258,6 +259,8 @@ export const MainLayout: React.FC = () => {
                     <Outlet />
                 </main>
             </div>
+
+            <ToastOverlay />
         </div>
     );
 };

@@ -79,7 +79,7 @@ const IntroPage: React.FC = () => {
                         ))}
                     </div>
                     <p className="text-slate-500 dark:text-slate-500 text-sm font-medium">
-                        Trusted by over <span className="text-slate-900 dark:text-slate-200">2,000+</span> teams worldwide
+                        Trusted by over <span className="text-slate-900 dark:text-slate-200">5+</span> teams worldwide
                     </p>
                 </div>
             </main>
