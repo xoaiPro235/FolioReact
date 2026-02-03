@@ -9,11 +9,13 @@ export const ToastOverlay: React.FC = () => {
     const navigate = useNavigate();
 
     const handleToastClick = (toast: { id: string; link?: string; onClick?: () => void }) => {
+        if (toast.onClick) {
+            toast.onClick();
+        }
         if (toast.link) {
             navigate(toast.link);
-            removeToast(toast.id);
-        } else if (toast.onClick) {
-            toast.onClick();
+        }
+        if (toast.link || toast.onClick) {
             removeToast(toast.id);
         }
     };

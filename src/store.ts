@@ -824,7 +824,7 @@ export const useStore = create<AppState>((set, get) => ({
     };
     newNotif.link = link;
     set(state => ({ notifications: [newNotif, ...state.notifications] }));
-    get().addToast(msg, type, link);
+    get().addToast(msg, type, link, () => get().markNotificationRead(newNotif.id));
   },
 
   addDetailedNotification: (notif) => {
@@ -851,7 +851,7 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return { notifications: [newNotif, ...state.notifications] };
     });
-    get().addToast(newNotif.message, newNotif.type, newNotif.link);
+    get().addToast(newNotif.message, newNotif.type, newNotif.link, () => get().markNotificationRead(newNotif.id));
   },
 
   loadNotifications: async () => {
@@ -1138,10 +1138,11 @@ export const useStore = create<AppState>((set, get) => ({
       toasts: [...state.toasts, { id, message, type, link, onClick }]
     }));
 
-    // Auto remove after 2s
+    // Auto remove after 4s for clickable toasts, 2s for normal ones
+    const duration = (link || onClick) ? 4000 : 2000;
     setTimeout(() => {
       get().removeToast(id);
-    }, 2000);
+    }, duration);
   },
 
   removeToast: (id) => {
