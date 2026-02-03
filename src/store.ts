@@ -804,7 +804,7 @@ export const useStore = create<AppState>((set, get) => ({
     const newNotif: AppNotification = {
       id: `toast-${Date.now()}`,
       message: msg,
-      read: true,
+      read: false,
       type: type,
       createdAt: new Date().toISOString(),
       title: type === 'ERROR' ? 'Error' : type === 'SUCCESS' ? 'Success' : 'Info'
