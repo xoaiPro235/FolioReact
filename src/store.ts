@@ -11,7 +11,7 @@ interface AppState {
   // currentView: ViewState; // Routing handles this now
   theme: Theme;
   notifications: AppNotification[];
-  toasts: { id: string; message: string; type: AppNotification['type'] }[];
+  toasts: { id: string; message: string; type: AppNotification['type']; link?: string; onClick?: () => void }[];
 
   // Navigation & Modal State
   selectedTaskId: string | null; // Global modal control
@@ -80,7 +80,7 @@ interface AppState {
   handleSignalRUpdate: (type: string, payload: any) => void;
 
   // Toast Actions
-  addToast: (message: string, type?: AppNotification['type']) => void;
+  addToast: (message: string, type?: AppNotification['type'], link?: string, onClick?: () => void) => void;
   removeToast: (id: string) => void;
 
   // Team
@@ -813,7 +813,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  addNotification: (msg, type: AppNotification['type'] = 'INFO') => {
+  addNotification: (msg, type: AppNotification['type'] = 'INFO', link?: string) => {
     const newNotif: AppNotification = {
       id: `toast-${Date.now()}`,
       message: msg,
@@ -822,8 +822,9 @@ export const useStore = create<AppState>((set, get) => ({
       createdAt: new Date().toISOString(),
       title: type === 'ERROR' ? 'Error' : type === 'SUCCESS' ? 'Success' : 'Info'
     };
+    newNotif.link = link;
     set(state => ({ notifications: [newNotif, ...state.notifications] }));
-    get().addToast(msg, type);
+    get().addToast(msg, type, link);
   },
 
   addDetailedNotification: (notif) => {
@@ -850,7 +851,7 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return { notifications: [newNotif, ...state.notifications] };
     });
-    get().addToast(newNotif.message, newNotif.type);
+    get().addToast(newNotif.message, newNotif.type, newNotif.link);
   },
 
   loadNotifications: async () => {
@@ -1131,10 +1132,10 @@ export const useStore = create<AppState>((set, get) => ({
     return member ? (member.role as Role) : null;
   },
 
-  addToast: (message, type = 'INFO') => {
+  addToast: (message, type = 'INFO', link, onClick) => {
     const id = Math.random().toString(36).substring(2, 9);
     set(state => ({
-      toasts: [...state.toasts, { id, message, type }]
+      toasts: [...state.toasts, { id, message, type, link, onClick }]
     }));
 
     // Auto remove after 2s

@@ -1,10 +1,22 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 
 export const ToastOverlay: React.FC = () => {
     const { toasts, removeToast } = useStore();
+    const navigate = useNavigate();
+
+    const handleToastClick = (toast: { id: string; link?: string; onClick?: () => void }) => {
+        if (toast.link) {
+            navigate(toast.link);
+            removeToast(toast.id);
+        } else if (toast.onClick) {
+            toast.onClick();
+            removeToast(toast.id);
+        }
+    };
 
     return (
         <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
@@ -17,12 +29,16 @@ export const ToastOverlay: React.FC = () => {
                         exit={{ opacity: 0, x: 20, scale: 0.9, transition: { duration: 0.2 } }}
                         className="pointer-events-auto"
                     >
-                        <div className={`
-                            min-w-[280px] max-w-[400px] bg-white dark:bg-slate-900 
-                            border border-slate-200 dark:border-slate-800 
-                            shadow-xl rounded-xl p-4 flex items-center gap-3
-                            transition-all duration-300
-                        `}>
+                        <div
+                            onClick={() => handleToastClick(toast)}
+                            className={`
+                                min-w-[280px] max-w-[400px] bg-white dark:bg-slate-900 
+                                border border-slate-200 dark:border-slate-800 
+                                shadow-xl rounded-xl p-4 flex items-center gap-3
+                                transition-all duration-300
+                                ${(toast.link || toast.onClick) ? 'cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 active:scale-[0.98]' : ''}
+                            `}
+                        >
                             <div className={`
                                 flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center
                                 ${toast.type === 'SUCCESS' ? 'bg-green-100 dark:bg-green-900/30 text-green-600' :
@@ -43,7 +59,10 @@ export const ToastOverlay: React.FC = () => {
                             </div>
 
                             <button
-                                onClick={() => removeToast(toast.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeToast(toast.id);
+                                }}
                                 className="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
                                 <X size={16} />
