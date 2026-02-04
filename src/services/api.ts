@@ -66,7 +66,7 @@ export const loginUser = async (
 
 
 export const registerUser = async (userData: any): Promise<void> => {
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: userData.email,
     password: userData.password,
     options: {
@@ -78,6 +78,12 @@ export const registerUser = async (userData: any): Promise<void> => {
   });
 
   if (error) throw new Error(error.message);
+
+  // If identities is empty, it means the user already exists 
+  // (Supabase returns this to prevent email enumeration)
+  if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+    throw new Error("This email is already registered. Please sign in instead.");
+  }
 };
 
 export const resetPasswordForEmail = async (email: string): Promise<void> => {
