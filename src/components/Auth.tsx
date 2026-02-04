@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const Auth: React.FC = () => {
   const { login, register, resetPassword, isLoading } = useStore();
 
-  // Auth Modes: 'login' | 'register' | 'forgot' | 'reset-sent'
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset-sent'>('login');
+  // Auth Modes: 'login' | 'register' | 'forgot' | 'reset-sent' | 'register-sent'
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset-sent' | 'register-sent'>('login');
 
   // State thông báo lỗi
   const [loginError, setLoginError] = useState('');
@@ -47,13 +47,16 @@ export const Auth: React.FC = () => {
           setLoginError('Please fill in all fields.');
           return;
         }
-
         await register({
           firstName: regFirstName,
           lastName: regLastName,
           email: regEmail,
           password: regPassword
         });
+        // Chỉ chuyển sang mode check mail nếu chưa được login (do cần confirm mail)
+        if (!useStore.getState().currentUser) {
+          setMode('register-sent');
+        }
       } else if (mode === 'forgot') {
         if (!email) {
           setLoginError('Please enter your email.');
@@ -154,7 +157,9 @@ export const Auth: React.FC = () => {
                       ? 'Create an account to join the community'
                       : mode === 'forgot'
                         ? 'Enter your email to receive a reset link'
-                        : 'We have sent a password reset link to your email'}
+                        : mode === 'reset-sent'
+                          ? 'We have sent a password reset link to your email'
+                          : 'We have sent a confirmation link to your email'}
                 </p>
               </div>
 
@@ -260,7 +265,11 @@ export const Auth: React.FC = () => {
                           <Layout className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                         </div>
                         <p className="text-slate-600 dark:text-slate-400">
-                          We've sent an email to <span className="font-bold text-slate-900 dark:text-white">{email}</span> with instructions to reset your password.
+                          {mode === 'reset-sent' ? (
+                            <>We've sent an email to <span className="font-bold text-slate-900 dark:text-white">{email}</span> with instructions to reset your password.</>
+                          ) : (
+                            <>We've sent a confirmation email to <span className="font-bold text-slate-900 dark:text-white">{regEmail}</span>. Please verify your account to continue.</>
+                          )}
                         </p>
                         <button
                           type="button"
@@ -272,7 +281,7 @@ export const Auth: React.FC = () => {
                       </div>
                     )}
 
-                    {mode !== 'reset-sent' && (
+                    {mode !== 'reset-sent' && mode !== 'register-sent' && (
                       <button
                         type="submit"
                         disabled={isLoading}
@@ -296,7 +305,7 @@ export const Auth: React.FC = () => {
             <div className="p-8 sm:p-10 bg-slate-100/30 dark:bg-slate-800/30 border-t border-slate-200/50 dark:border-slate-700/50 text-center">
               <p className="text-slate-500 dark:text-slate-400 font-bold">
                 {mode === 'login' ? "New to the platform?" : mode === 'register' ? "Already part of the team?" : ""}
-                {mode !== 'forgot' && mode !== 'reset-sent' && (
+                {mode !== 'forgot' && mode !== 'reset-sent' && mode !== 'register-sent' && (
                   <button
                     type="button"
                     className="text-blue-600 dark:text-blue-400 font-black ml-2 hover:text-blue-700 dark:hover:text-blue-300 transition-colors focus:outline-none"
