@@ -778,19 +778,8 @@ export const useStore = create<AppState>((set, get) => ({
       )
     }));
 
-    // Send detailed notification about new comment
-    const task = get().tasks.find(t => t.id === taskId);
-    if (task) {
-      get().addDetailedNotification({
-        message: `${currentUser.name} added a comment to "${task.title}"`,
-        title: 'New Comment',
-        type: 'INFO',
-        link: `/project/${task.projectId}/board?selectedIssue=${taskId}`
-      });
-
-      // Invalidate React Query cache to sync UI
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    }
+    // Invalidate React Query cache to sync UI
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
   },
 
   deleteComment: async (taskId, commentId) => {
