@@ -84,7 +84,7 @@ export const MainLayout: React.FC = () => {
                     <button onClick={toggleTheme} className="p-2.5 hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-yellow-400 hover:rotate-12">
                         {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
-                    <button onClick={handleLogout} className="p-2.5 hover:bg-red-500/10 rounded-xl transition-all text-slate-500 hover:text-red-500" title="Logout">
+                    <button onClick={handleLogout} className="p-2.5 hover:bg-red-500/10 rounded-xl transition-all text-slate-500 hover:text-red-500" title="Sign Out">
                         <LogOut size={20} />
                     </button>
                 </div>
