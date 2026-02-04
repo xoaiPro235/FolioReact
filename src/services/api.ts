@@ -101,6 +101,11 @@ export const updatePassword = async (newPassword: string): Promise<void> => {
   if (error) throw new Error(error.message);
 };
 
+export const checkEmailExists = async (email: string): Promise<boolean> => {
+  const response: any = await axiosClient.get(`/users/exists?email=${encodeURIComponent(email)}`);
+  return response.exists;
+};
+
 // --------USER------------
 
 export const fetchUsers = async (): Promise<User[]> => {

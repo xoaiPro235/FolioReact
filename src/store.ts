@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { Task, Project, User, TaskStatus, ViewState, Role, ActivityLog, AppNotification, Theme, Priority, Comment, FileAttachment, ProjectMember } from './types';
-import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser, fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, updateProjectApi, resetPasswordForEmail, updatePassword as updatePasswordApi } from './services/api';
+import { fetchTasks, fetchProjects, fetchUsers, fetchActivities, loginUser, registerUser, uploadFile, fetchProjectMembers, createProject, deleteProjectApi, createTask, updateTask, deleteTask, addProjectMember, removeProjectMember, updateProjectMemberRole, createComment, deleteFile, deleteComment, updateProfile, removeUser, fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, updateProjectApi, resetPasswordForEmail, updatePassword as updatePasswordApi, checkEmailExists } from './services/api';
 import { supabase } from './supabaseClient';
 import { queryClient } from './queryClient';
 
@@ -274,6 +274,13 @@ export const useStore = create<AppState>((set, get) => ({
   resetPassword: async (email) => {
     set({ isLoading: true });
     try {
+      // 1. Kiểm tra email có tồn tại không
+      const exists = await checkEmailExists(email);
+      if (!exists) {
+        throw new Error("Email not found in our system.");
+      }
+
+      // 2. Gửi link reset
       await resetPasswordForEmail(email);
       set({ isLoading: false });
       get().addNotification("Reset link sent to your email!", "SUCCESS");
