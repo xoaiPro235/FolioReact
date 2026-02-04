@@ -877,8 +877,8 @@ export const useStore = create<AppState>((set, get) => ({
       notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
     }));
 
-    // If the ID is a local temporary one (starts with 'n'), don't call the backend
-    if (id.startsWith('n')) {
+    // If the ID is a local temporary one (starts with 'toast-' or 'n'), don't call the backend
+    if (id.startsWith('toast-') || id.startsWith('n')) {
       return;
     }
 
