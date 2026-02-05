@@ -17,7 +17,12 @@ export const Profile: React.FC = () => {
     if (!currentUser) return null;
 
     const handleSave = () => {
-        updateProfile({ name, bio, avatarUrl: avatar });
+        let finalAvatar = avatar;
+        if (!avatar.trim()) {
+            finalAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+            setAvatar(finalAvatar);
+        }
+        updateProfile({ name, bio, avatarUrl: finalAvatar });
     };
 
     const handleDelete = () => {
