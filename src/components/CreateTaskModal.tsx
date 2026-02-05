@@ -164,20 +164,18 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-3 md:col-span-2">
                   <div className="flex-1">
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Start</label>
-                    <input
-                      type="date"
+                    <DateInput
                       value={startDate}
-                      onChange={e => setStartDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:[color-scheme:dark] h-11"
+                      onChange={setStartDate}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg h-11"
                     />
                   </div>
                   <div className="flex-1">
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><Calendar className="w-4 h-4" /> Due</label>
-                    <input
-                      type="date"
+                    <DateInput
                       value={dueDate}
-                      onChange={e => setDueDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:[color-scheme:dark] h-11"
+                      onChange={setDueDate}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg h-11"
                     />
                   </div>
                 </div>
