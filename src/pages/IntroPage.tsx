@@ -19,7 +19,7 @@ const IntroPage: React.FC = () => {
 
                 {/* Hero Section */}
                 <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-6">
-                    Manage Projects with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Precision.</span>
+                    Manage Projects with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Folio.</span>
                 </h1>
 
                 <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mb-12 leading-relaxed">
